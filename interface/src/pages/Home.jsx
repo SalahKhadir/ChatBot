@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { chatService } from '../services/api';
+import { Navbar, HistorySidebar } from '../components';
 import './Home.css';
 
 function Home() {
@@ -7,6 +8,7 @@ function Home() {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -75,9 +77,27 @@ function Home() {
     document.getElementById('fileInput').click();
   };
 
+  const handleHistoryToggle = () => {
+    setIsHistoryOpen(!isHistoryOpen);
+  };
+
+  const handleHistoryClose = () => {
+    setIsHistoryOpen(false);
+  };
+
   return (
-    <div className="home-container">
-      <div className="home-content">
+    <>
+      <Navbar 
+        onHistoryToggle={handleHistoryToggle} 
+        isHistoryOpen={isHistoryOpen}
+      />
+      <HistorySidebar 
+        isOpen={isHistoryOpen} 
+        onClose={handleHistoryClose}
+      />
+      
+      <div className={`home-container ${chatMessages.length > 0 ? 'chat-mode' : ''}`}>
+        <div className={`home-content ${chatMessages.length > 0 ? 'chat-mode' : ''}`}>
         {chatMessages.length === 0 ? (
           <>
             <div className="hero-section">
@@ -123,7 +143,7 @@ function Home() {
             </div>
           </>
         ) : (
-          <div className="chat-messages">
+          <div className={`chat-messages ${chatMessages.length > 0 ? 'fullscreen' : ''}`}>
             {chatMessages.map((msg, index) => (
               <div key={index} className={`message ${msg.type}`}>
                 {msg.type === 'user' && <div className="message-avatar user-avatar">You</div>}
@@ -157,7 +177,7 @@ function Home() {
           onChange={handleFileUpload}
         />
 
-        <div className="chat-input-container">
+        <div className={`chat-input-container ${chatMessages.length > 0 ? 'fullscreen' : ''}`}>
           <form onSubmit={handleSubmit} className="chat-form">
             <div className="input-wrapper">
               <input
@@ -195,8 +215,9 @@ function Home() {
             </div>
           </form>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

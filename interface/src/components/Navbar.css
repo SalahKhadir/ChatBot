@@ -1,0 +1,100 @@
+/* Navbar styles */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background-color: rgba(4, 4, 4, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(155, 155, 155, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  z-index: 1000;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.history-button {
+  background: transparent;
+  border: 1px solid rgba(155, 155, 155, 0.3);
+  color: #9b9b9b;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+}
+
+.history-button:hover {
+  border-color: #fb1b23;
+  color: #fb1b23;
+  background: rgba(251, 27, 35, 0.1);
+}
+
+.login-button {
+  background: #fb1b23;
+  border: none;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.login-button:hover {
+  background: #e01520;
+  transform: translateY(-1px);
+}
+
+.login-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0 1rem;
+  }
+  
+  .logo {
+    height: 35px;
+  }
+  
+  .login-button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
+}
