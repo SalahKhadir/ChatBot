@@ -1,0 +1,114 @@
+/* Global styles with custom color palette */
+/* CSS Reset */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+}
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Custom color palette */
+  --primary-gray: #9b9b9b;
+  --primary-black: #040404;
+  --primary-red: #fb1b23;
+  
+  color-scheme: dark;
+  color: var(--primary-gray);
+  background-color: var(--primary-black);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background-color: var(--primary-black);
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--primary-black);
+  color: var(--primary-gray);
+  overflow-x: hidden;
+}
+
+#root {
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--primary-black);
+}
+
+a {
+  font-weight: 500;
+  color: var(--primary-red);
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #e01520;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: var(--primary-red);
+  color: white;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+button:hover {
+  background-color: #e01520;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 2px solid var(--primary-red);
+  outline-offset: 2px;
+}
+
+input {
+  font-family: inherit;
+  font-size: 1em;
+}
+
+input:focus {
+  outline: 2px solid var(--primary-red);
+  outline-offset: 2px;
+}
