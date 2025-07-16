@@ -6,7 +6,7 @@ from google import genai
 from google.genai import types
 import pathlib
 import tempfile
-from typing import Optional
+from typing import Optional, List
 
 # Load environment variables from .env file
 load_dotenv()
@@ -57,34 +57,58 @@ async def chat(message: str = Form(...)):
 
 @app.post("/analyze-document")
 async def analyze_document(
-        file: UploadFile = File(...),
+        files: List[UploadFile] = File(...),
         prompt: str = Form(...)
 ):
-    """Handle document analysis with PDF/document upload"""
+    """Handle document analysis with multiple PDF/document uploads"""
     try:
-        # Check if file is a PDF
-        if file.content_type != "application/pdf":
-            raise HTTPException(status_code=400, detail="Only PDF files are supported")
-
-        # Read the file content
-        file_content = await file.read()
-
-        # Generate response using Gemini with PDF content
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
-            contents=[
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
+        
+        # Process each file and collect content
+        file_contents = []
+        file_info = []
+        
+        for file in files:
+            # Check if file is a PDF
+            if file.content_type != "application/pdf":
+                raise HTTPException(status_code=400, detail=f"File {file.filename} is not a PDF. Only PDF files are supported")
+            
+            # Read the file content
+            file_content = await file.read()
+            file_contents.append(file_content)
+            file_info.append({
+                "filename": file.filename,
+                "size": len(file_content)
+            })
+        
+        # Prepare content for Gemini - include all PDFs and the prompt
+        gemini_contents = []
+        
+        # Add all PDF files as parts
+        for i, file_content in enumerate(file_contents):
+            gemini_contents.append(
                 types.Part.from_bytes(
                     data=file_content,
                     mime_type='application/pdf',
-                ),
-                prompt
-            ]
+                )
+            )
+        
+        # Add the user's prompt at the end
+        gemini_contents.append(
+            f"Based on the {len(files)} PDF document(s) provided above, please answer the following question or complete the following task: {prompt}"
+        )
+
+        # Generate response using Gemini with all PDF contents
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-exp",
+            contents=gemini_contents
         )
 
         return {
             "response": response.text,
-            "filename": file.filename,
-            "file_size": len(file_content)
+            "files_processed": file_info,
+            "total_files": len(files)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

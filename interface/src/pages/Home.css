@@ -480,3 +480,146 @@
     gap: 2rem;
   }
 }
+
+/* Selected Files Display */
+.selected-files-container {
+  background: rgba(155, 155, 155, 0.1);
+  border: 1px solid rgba(155, 155, 155, 0.2);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  backdrop-filter: blur(10px);
+}
+
+.selected-files-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  color: #9b9b9b;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.clear-files-btn {
+  background: none;
+  border: 1px solid rgba(251, 27, 35, 0.5);
+  color: #fb1b23;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.3s ease;
+}
+
+.clear-files-btn:hover {
+  background: rgba(251, 27, 35, 0.1);
+  border-color: #fb1b23;
+}
+
+.selected-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.selected-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(155, 155, 155, 0.05);
+  border: 1px solid rgba(155, 155, 155, 0.1);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  color: #9b9b9b;
+  font-size: 0.9rem;
+}
+
+.file-name {
+  flex: 1;
+  font-weight: 500;
+  color: #9b9b9b;
+}
+
+.file-size {
+  color: rgba(155, 155, 155, 0.7);
+  font-size: 0.8rem;
+  margin-left: 0.5rem;
+}
+
+.remove-file-btn {
+  background: none;
+  border: none;
+  color: #fb1b23;
+  cursor: pointer;
+  font-size: 1.2rem;
+  font-weight: bold;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  margin-left: 0.5rem;
+}
+
+.remove-file-btn:hover {
+  background: rgba(251, 27, 35, 0.1);
+}
+
+/* Message Files Display */
+.message-files {
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(155, 155, 155, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid #fb1b23;
+}
+
+.files-header {
+  color: #fb1b23;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.files-list {
+  color: rgba(155, 155, 155, 0.8);
+  font-size: 0.85rem;
+}
+
+.file-item {
+  margin-bottom: 0.25rem;
+}
+
+/* Light theme styles for files */
+.home-container.light-theme .selected-files-container {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.home-container.light-theme .selected-files-header {
+  color: #333333;
+}
+
+.home-container.light-theme .selected-file-item {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.home-container.light-theme .file-name {
+  color: #333333;
+}
+
+.home-container.light-theme .file-size {
+  color: rgba(51, 51, 51, 0.7);
+}
+
+.home-container.light-theme .message-files {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.home-container.light-theme .files-list {
+  color: rgba(51, 51, 51, 0.8);
+}

@@ -26,15 +26,16 @@ function Home() {
       
       // Check if there are files selected for analysis
       if (selectedFiles.length > 0) {
-        // Use the first selected file for analysis
-        response = await chatService.analyzeDocument(selectedFiles[0], message);
+        // Use all selected files for analysis
+        response = await chatService.analyzeDocument(selectedFiles, message);
         
-        // Add AI response to chat
+        // Add AI response to chat with file information
         const aiMessage = { 
           type: 'ai', 
           content: response.response, 
           timestamp: new Date(),
-          filename: response.filename 
+          filesProcessed: response.files_processed,
+          totalFiles: response.total_files
         };
         setChatMessages(prev => [...prev, aiMessage]);
         
@@ -126,15 +127,10 @@ function Home() {
               <div className="suggestion-card" onClick={triggerFileInput}>
                 <div className="suggestion-icon">🔍</div>
                 <h3>Research & Analysis</h3>
-                <p>Get insights and analyze information</p>
+                <p>Upload multiple PDFs for comprehensive analysis</p>
                 {selectedFiles.length > 0 && (
                   <div className="selected-files">
                     <p className="files-count">{selectedFiles.length} file(s) selected</p>
-                    <div className="file-list">
-                      {selectedFiles.map((file, index) => (
-                        <span key={index} className="file-name">{file.name}</span>
-                      ))}
-                    </div>
                   </div>
                 )}
               </div>
@@ -157,6 +153,20 @@ function Home() {
                 {msg.type === 'user' && <div className="message-avatar user-avatar">You</div>}
                 {msg.type === 'ai' && <div className="message-avatar ai-avatar">AI</div>}
                 <div className="message-content">
+                  {msg.filesProcessed && (
+                    <div className="message-files">
+                      <div className="files-header">
+                        📄 Analyzed {msg.totalFiles} document{msg.totalFiles > 1 ? 's' : ''}:
+                      </div>
+                      <div className="files-list">
+                        {msg.filesProcessed.map((file, fileIndex) => (
+                          <div key={fileIndex} className="file-item">
+                            • {file.filename} ({(file.size / 1024).toFixed(1)} KB)
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {msg.filename && (
                     <div className="message-file">📄 Analyzing: {msg.filename}</div>
                   )}
@@ -186,6 +196,40 @@ function Home() {
         />
 
         <div className={`chat-input-container ${chatMessages.length > 0 ? 'fullscreen' : ''}`}>
+          {/* Selected Files Display */}
+          {selectedFiles.length > 0 && (
+            <div className="selected-files-container">
+              <div className="selected-files-header">
+                <span>Selected Files ({selectedFiles.length}):</span>
+                <button 
+                  type="button" 
+                  onClick={() => setSelectedFiles([])}
+                  className="clear-files-btn"
+                >
+                  Clear All
+                </button>
+              </div>
+              <div className="selected-files-list">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="selected-file-item">
+                    <span className="file-name">{file.name}</span>
+                    <span className="file-size">({(file.size / 1024).toFixed(1)} KB)</span>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const newFiles = selectedFiles.filter((_, i) => i !== index);
+                        setSelectedFiles(newFiles);
+                      }}
+                      className="remove-file-btn"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit} className="chat-form">
             <div className="input-wrapper">
               <input

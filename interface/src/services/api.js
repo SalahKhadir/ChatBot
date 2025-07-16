@@ -19,10 +19,20 @@ export const chatService = {
     return response.json();
   },
 
-  // Send a document for analysis
-  async analyzeDocument(file, prompt) {
+  // Send multiple documents for analysis
+  async analyzeDocument(files, prompt) {
     const formData = new FormData();
-    formData.append('file', file);
+    
+    // Add all files to the form data
+    if (Array.isArray(files)) {
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+    } else {
+      // Single file compatibility
+      formData.append('files', files);
+    }
+    
     formData.append('prompt', prompt);
     
     const response = await fetch(`${API_BASE_URL}/analyze-document`, {
@@ -31,7 +41,7 @@ export const chatService = {
     });
     
     if (!response.ok) {
-      throw new Error('Failed to analyze document');
+      throw new Error('Failed to analyze document(s)');
     }
     
     return response.json();
