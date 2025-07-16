@@ -20,7 +20,7 @@ if not KEY:
     print("Please set your Gemini API key as an environment variable.")
     exit(1)
 
-print(f"✓ API key loaded: {KEY[:10]}...")  # Show first 10 chars for verification
+print(f"✓ API key loaded: {KEY[:5]}...")  # Show first 10 chars for verification
 
 app = FastAPI()
 
