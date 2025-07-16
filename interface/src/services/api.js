@@ -2,10 +2,13 @@
 const API_BASE_URL = 'http://localhost:8000';
 
 export const chatService = {
-  // Send a simple text message
-  async sendMessage(message) {
+  // Send a simple text message with optional session context
+  async sendMessage(message, sessionId = null) {
     const formData = new FormData();
     formData.append('message', message);
+    if (sessionId) {
+      formData.append('session_id', sessionId);
+    }
     
     const response = await fetch(`${API_BASE_URL}/chat`, {
       method: 'POST',

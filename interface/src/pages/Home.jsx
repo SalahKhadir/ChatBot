@@ -10,6 +10,8 @@ function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [hasDocumentContext, setHasDocumentContext] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,27 +31,33 @@ function Home() {
         // Use all selected files for analysis
         response = await chatService.analyzeDocument(selectedFiles, message);
         
+        // Set session context for future messages
+        setCurrentSessionId(response.session_id);
+        setHasDocumentContext(true);
+        
         // Add AI response to chat with file information
         const aiMessage = { 
           type: 'ai', 
           content: response.response, 
           timestamp: new Date(),
           filesProcessed: response.files_processed,
-          totalFiles: response.total_files
+          totalFiles: response.total_files,
+          sessionId: response.session_id
         };
         setChatMessages(prev => [...prev, aiMessage]);
         
         // Clear selected files after analysis
         setSelectedFiles([]);
       } else {
-        // Regular chat message
-        response = await chatService.sendMessage(message);
+        // Regular chat message (with or without document context)
+        response = await chatService.sendMessage(message, currentSessionId);
         
         // Add AI response to chat
         const aiMessage = { 
           type: 'ai', 
           content: response.response, 
-          timestamp: new Date() 
+          timestamp: new Date(),
+          hasDocumentContext: response.has_document_context || false
         };
         setChatMessages(prev => [...prev, aiMessage]);
       }
@@ -170,6 +178,11 @@ function Home() {
                   {msg.filename && (
                     <div className="message-file">📄 Analyzing: {msg.filename}</div>
                   )}
+                  {msg.hasDocumentContext && (
+                    <div className="message-context-indicator">
+                      <span className="context-badge">📄 Document Context</span>
+                    </div>
+                  )}
                   <div className="message-text">{msg.content}</div>
                 </div>
               </div>
@@ -196,6 +209,25 @@ function Home() {
         />
 
         <div className={`chat-input-container ${chatMessages.length > 0 ? 'fullscreen' : ''}`}>
+          {/* Document Context Indicator */}
+          {hasDocumentContext && (
+            <div className="document-context-indicator">
+              <div className="context-icon">📄</div>
+              <span>Chat has document context - AI can reference uploaded documents</span>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setCurrentSessionId(null);
+                  setHasDocumentContext(false);
+                }}
+                className="clear-context-btn"
+                title="Clear document context"
+              >
+                Clear Context
+              </button>
+            </div>
+          )}
+          
           {/* Selected Files Display */}
           {selectedFiles.length > 0 && (
             <div className="selected-files-container">

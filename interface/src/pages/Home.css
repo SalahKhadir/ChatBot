@@ -481,6 +481,67 @@
   }
 }
 
+/* Document Context Indicator */
+.document-context-indicator {
+  background: linear-gradient(135deg, rgba(251, 27, 35, 0.1) 0%, rgba(251, 27, 35, 0.05) 100%);
+  border: 1px solid rgba(251, 27, 35, 0.3);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  backdrop-filter: blur(10px);
+}
+
+.context-icon {
+  font-size: 1.2rem;
+  color: #fb1b23;
+}
+
+.document-context-indicator span {
+  flex: 1;
+  color: #fb1b23;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.clear-context-btn {
+  background: none;
+  border: 1px solid rgba(251, 27, 35, 0.5);
+  color: #fb1b23;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.3s ease;
+}
+
+.clear-context-btn:hover {
+  background: rgba(251, 27, 35, 0.1);
+  border-color: #fb1b23;
+}
+
+/* Light theme document context */
+.home-container.light-theme .document-context-indicator {
+  background: linear-gradient(135deg, rgba(251, 27, 35, 0.08) 0%, rgba(251, 27, 35, 0.03) 100%);
+  border-color: rgba(251, 27, 35, 0.2);
+}
+
+.home-container.light-theme .document-context-indicator span {
+  color: #d01520;
+}
+
+.home-container.light-theme .clear-context-btn {
+  color: #d01520;
+  border-color: rgba(251, 27, 35, 0.4);
+}
+
+.home-container.light-theme .clear-context-btn:hover {
+  background: rgba(251, 27, 35, 0.08);
+  border-color: #d01520;
+}
+
 /* Selected Files Display */
 .selected-files-container {
   background: rgba(155, 155, 155, 0.1);
@@ -591,6 +652,29 @@
 
 .file-item {
   margin-bottom: 0.25rem;
+}
+
+/* Message Context Indicator */
+.message-context-indicator {
+  margin-bottom: 0.5rem;
+}
+
+.context-badge {
+  display: inline-block;
+  background: rgba(251, 27, 35, 0.1);
+  color: #fb1b23;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid rgba(251, 27, 35, 0.2);
+}
+
+/* Light theme message context */
+.home-container.light-theme .context-badge {
+  background: rgba(251, 27, 35, 0.08);
+  color: #d01520;
+  border-color: rgba(251, 27, 35, 0.15);
 }
 
 /* Light theme styles for files */

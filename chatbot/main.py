@@ -7,6 +7,7 @@ from google.genai import types
 import pathlib
 import tempfile
 from typing import Optional, List
+import uuid
 
 # Load environment variables from .env file
 load_dotenv()
@@ -41,16 +42,59 @@ except Exception as e:
     print(f"ERROR: Failed to initialize Gemini client: {e}")
     exit(1)
 
+# Store document sessions in memory (in production, use a database)
+document_sessions = {}
 
 @app.post("/chat")
-async def chat(message: str = Form(...)):
-    """Handle simple text-based chat messages"""
+async def chat(message: str = Form(...), session_id: str = Form(None)):
+    """Handle simple text-based chat messages with optional document context"""
     try:
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
-            contents=[message]
-        )
-        return {"response": response.text}
+        # Check if there's a document session for this chat
+        if session_id and session_id in document_sessions:
+            # Continue conversation with document context
+            session_data = document_sessions[session_id]
+            
+            # Build context with documents and conversation history
+            gemini_contents = []
+            
+            # Add all PDF files from the session
+            for file_content in session_data['file_contents']:
+                gemini_contents.append(
+                    types.Part.from_bytes(
+                        data=file_content,
+                        mime_type='application/pdf',
+                    )
+                )
+            
+            # Add conversation history
+            for msg in session_data['conversation_history']:
+                gemini_contents.append(msg)
+            
+            # Add current message
+            gemini_contents.append(f"User: {message}")
+            
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-exp",
+                contents=gemini_contents
+            )
+            
+            # Update conversation history
+            session_data['conversation_history'].append(f"User: {message}")
+            session_data['conversation_history'].append(f"Assistant: {response.text}")
+            
+            return {
+                "response": response.text,
+                "session_id": session_id,
+                "has_document_context": True
+            }
+        else:
+            # Regular chat without document context
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-exp",
+                contents=[message]
+            )
+            return {"response": response.text}
+            
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -64,6 +108,9 @@ async def analyze_document(
     try:
         if not files:
             raise HTTPException(status_code=400, detail="No files provided")
+        
+        # Create a new session ID for this document analysis
+        session_id = str(uuid.uuid4())
         
         # Process each file and collect content
         file_contents = []
@@ -105,10 +152,21 @@ async def analyze_document(
             contents=gemini_contents
         )
 
+        # Store the session data for future context
+        document_sessions[session_id] = {
+            'file_contents': file_contents,
+            'file_info': file_info,
+            'conversation_history': [
+                f"User: {prompt}",
+                f"Assistant: {response.text}"
+            ]
+        }
+
         return {
             "response": response.text,
             "files_processed": file_info,
-            "total_files": len(files)
+            "total_files": len(files),
+            "session_id": session_id
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
