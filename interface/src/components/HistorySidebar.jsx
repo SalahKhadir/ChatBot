@@ -1,6 +1,6 @@
 import './HistorySidebar.css';
 
-function HistorySidebar({ isOpen, onClose }) {
+function HistorySidebar({ isOpen, onClose, isDarkMode }) {
   const isLoggedIn = false; // TODO: Replace with actual login state
 
   const mockHistory = [
@@ -17,7 +17,7 @@ function HistorySidebar({ isOpen, onClose }) {
   };
 
   return (
-    <div className={`history-sidebar ${isOpen ? 'open' : ''}`}>
+    <div className={`history-sidebar ${isOpen ? 'open' : ''} ${isDarkMode ? 'dark-theme' : 'light-theme'}`}>
       <div className="history-header">
         <h3>Chat History</h3>
         <button className="close-button" onClick={onClose}>

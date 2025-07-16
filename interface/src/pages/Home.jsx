@@ -9,6 +9,7 @@ function Home() {
   const [chatMessages, setChatMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -85,18 +86,25 @@ function Home() {
     setIsHistoryOpen(false);
   };
 
+  const handleThemeToggle = () => {
+    setIsDarkMode(!isDarkMode);
+  };
+
   return (
     <>
       <Navbar 
         onHistoryToggle={handleHistoryToggle} 
         isHistoryOpen={isHistoryOpen}
+        onThemeToggle={handleThemeToggle}
+        isDarkMode={isDarkMode}
       />
       <HistorySidebar 
         isOpen={isHistoryOpen} 
         onClose={handleHistoryClose}
+        isDarkMode={isDarkMode}
       />
       
-      <div className={`home-container ${chatMessages.length > 0 ? 'chat-mode' : ''}`}>
+      <div className={`home-container ${chatMessages.length > 0 ? 'chat-mode' : ''} ${isDarkMode ? 'dark-theme' : 'light-theme'}`}>
         <div className={`home-content ${chatMessages.length > 0 ? 'chat-mode' : ''}`}>
         {chatMessages.length === 0 ? (
           <>
