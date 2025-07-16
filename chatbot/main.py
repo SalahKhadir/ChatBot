@@ -41,6 +41,7 @@ except Exception as e:
     print(f"ERROR: Failed to initialize Gemini client: {e}")
     exit(1)
 
+
 @app.post("/chat")
 async def chat(message: str = Form(...)):
     """Handle simple text-based chat messages"""
@@ -56,18 +57,18 @@ async def chat(message: str = Form(...)):
 
 @app.post("/analyze-document")
 async def analyze_document(
-    file: UploadFile = File(...),
-    prompt: str = Form(...)
+        file: UploadFile = File(...),
+        prompt: str = Form(...)
 ):
     """Handle document analysis with PDF/document upload"""
     try:
         # Check if file is a PDF
         if file.content_type != "application/pdf":
             raise HTTPException(status_code=400, detail="Only PDF files are supported")
-        
+
         # Read the file content
         file_content = await file.read()
-        
+
         # Generate response using Gemini with PDF content
         response = client.models.generate_content(
             model="gemini-2.0-flash-exp",
@@ -79,7 +80,7 @@ async def analyze_document(
                 prompt
             ]
         )
-        
+
         return {
             "response": response.text,
             "filename": file.filename,
@@ -97,4 +98,3 @@ async def root():
 @app.get("/hello/{name}")
 async def say_hello(name: str):
     return {"message": f"Hello {name}"}
-
