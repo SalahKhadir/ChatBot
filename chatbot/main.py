@@ -51,6 +51,9 @@ try:
 except Exception as e:
     raise Exception(f"Failed to initialize Gemini client: {e}")
 
+# CGI System Instruction
+CGI_SYSTEM_INSTRUCTION = """You are a professional AI assistant for CGI (Compagnie générale immobilière), Morocco's leading real estate company since 1960. You specialize in luxury properties, golf communities, and investment opportunities. Always respond professionally and mention CGI's expertise."""
+
 # In-memory storage for document sessions
 document_sessions = {}
 
@@ -310,10 +313,13 @@ async def analyze_documents_public(
 # ============================================================================
 
 async def _chat_without_context(message: str) -> str:
-    """Generate AI response without document context"""
+    """Generate AI response without document context using CGI system instruction"""
     response = gemini_client.models.generate_content(
         model="gemini-2.0-flash-exp",
-        contents=[message]
+        contents=[message],
+        config=types.GenerateContentConfig(
+            system_instruction=CGI_SYSTEM_INSTRUCTION
+        )
     )
     return response.text
 
@@ -342,7 +348,10 @@ async def _chat_with_document_context(message: str, session_id: str) -> str:
     
     response = gemini_client.models.generate_content(
         model="gemini-2.0-flash-exp",
-        contents=gemini_contents
+        contents=gemini_contents,
+        config=types.GenerateContentConfig(
+            system_instruction=CGI_SYSTEM_INSTRUCTION
+        )
     )
     
     # Update conversation history
@@ -394,7 +403,10 @@ async def _analyze_documents_with_ai(file_contents: list, prompt: str, file_coun
     # Generate response
     response = gemini_client.models.generate_content(
         model="gemini-2.0-flash-exp",
-        contents=gemini_contents
+        contents=gemini_contents,
+        config=types.GenerateContentConfig(
+            system_instruction=CGI_SYSTEM_INSTRUCTION
+        )
     )
 
     return response.text

@@ -90,6 +90,27 @@
   color: #333333;
 }
 
+/* Light theme Markdown formatting styles */
+.home-container.light-theme .message-text strong {
+  color: #000000;
+  font-weight: 600;
+}
+
+.home-container.light-theme .message-text em {
+  color: #444444;
+  font-style: italic;
+}
+
+.home-container.light-theme .message-text code {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #333333;
+}
+
+.home-container.light-theme .message-text pre {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #333333;
+}
+
 .home-container.light-theme .ai-avatar {
   background-color: #333333;
   color: #ffffff;
@@ -298,6 +319,55 @@
   color: #9b9b9b;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+/* Markdown formatting styles */
+.message-text strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.message-text em {
+  color: #cccccc;
+  font-style: italic;
+}
+
+.message-text p {
+  margin: 0 0 1rem 0;
+}
+
+.message-text p:last-child {
+  margin-bottom: 0;
+}
+
+.message-text ul, .message-text ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.message-text li {
+  margin: 0.25rem 0;
+}
+
+.message-text code {
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+.message-text pre {
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 1rem;
+  border-radius: 5px;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+.message-text pre code {
+  background-color: transparent;
+  padding: 0;
 }
 
 .message.user .message-text {

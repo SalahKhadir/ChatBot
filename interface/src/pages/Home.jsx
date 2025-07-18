@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { chatService } from '../services/api';
 import { Navbar, HistorySidebar } from '../components';
 import './Home.css';
@@ -183,7 +184,13 @@ function Home() {
                       <span className="context-badge">📄 Document Context</span>
                     </div>
                   )}
-                  <div className="message-text">{msg.content}</div>
+                  <div className="message-text">
+                    {msg.type === 'ai' ? (
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    ) : (
+                      msg.content
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
