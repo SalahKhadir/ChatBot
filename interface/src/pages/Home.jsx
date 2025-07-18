@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { chatService } from '../services/api';
-import { Navbar, HistorySidebar } from '../components';
+import { Navbar, HistorySidebar, TypingMessage } from '../components';
+import { useAutoScroll } from '../hooks/useAutoScroll';
 import './Home.css';
 
 function Home() {
@@ -13,6 +14,9 @@ function Home() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [hasDocumentContext, setHasDocumentContext] = useState(false);
+  
+  // Auto-scroll hook
+  const messagesScrollRef = useAutoScroll([chatMessages, isLoading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -156,7 +160,7 @@ function Home() {
             </div>
           </>
         ) : (
-          <div className={`chat-messages ${chatMessages.length > 0 ? 'fullscreen' : ''}`}>
+          <div ref={messagesScrollRef} className={`chat-messages ${chatMessages.length > 0 ? 'fullscreen' : ''}`}>
             {chatMessages.map((msg, index) => (
               <div key={index} className={`message ${msg.type}`}>
                 {msg.type === 'user' && <div className="message-avatar user-avatar">You</div>}
@@ -184,13 +188,14 @@ function Home() {
                       <span className="context-badge">📄 Document Context</span>
                     </div>
                   )}
-                  <div className="message-text">
-                    {msg.type === 'ai' ? (
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
-                    ) : (
-                      msg.content
-                    )}
-                  </div>
+                  {msg.type === 'ai' ? (
+                    <TypingMessage 
+                      content={msg.content} 
+                      isLatestMessage={index === chatMessages.length - 1}
+                    />
+                  ) : (
+                    <div className="message-text">{msg.content}</div>
+                  )}
                 </div>
               </div>
             ))}

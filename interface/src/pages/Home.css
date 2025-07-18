@@ -111,6 +111,11 @@
   color: #333333;
 }
 
+/* Light theme typing cursor */
+.home-container.light-theme .typing-cursor {
+  color: #fb1b23;
+}
+
 .home-container.light-theme .ai-avatar {
   background-color: #333333;
   color: #ffffff;
@@ -241,8 +246,10 @@
   gap: 1rem;
   max-height: 60vh;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1rem;
   margin-bottom: 2rem;
+  scroll-behavior: smooth;
 }
 
 .chat-messages.fullscreen {
@@ -250,6 +257,39 @@
   padding: 2rem;
   margin-bottom: 0;
   width: 100%;
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for chat messages */
+.chat-messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(251, 27, 35, 0.6);
+  border-radius: 4px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(251, 27, 35, 0.8);
+}
+
+/* Light theme scrollbar */
+.home-container.light-theme .chat-messages::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.home-container.light-theme .chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(251, 27, 35, 0.6);
+}
+
+.home-container.light-theme .chat-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(251, 27, 35, 0.8);
 }
 
 .chat-input-container.fullscreen {
@@ -319,6 +359,37 @@
   color: #9b9b9b;
   line-height: 1.5;
   white-space: pre-wrap;
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Typing animation styles */
+.typing-cursor {
+  color: #fb1b23;
+  font-weight: bold;
+  animation: blink 1s infinite;
+  margin-left: 2px;
+}
+
+/* Inline cursor styling for markdown */
+.message-text p:last-child::after {
+  content: "";
+}
+
+.message-text.typing::after {
+  content: "|";
+  color: #fb1b23;
+  font-weight: bold;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Markdown formatting styles */
