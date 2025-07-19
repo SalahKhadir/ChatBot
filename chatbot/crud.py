@@ -80,3 +80,79 @@ def get_session_messages(db: Session, session_id: int, skip: int = 0, limit: int
 
 def get_user_messages(db: Session, user_id: int, skip: int = 0, limit: int = 100) -> List[Message]:
     return db.query(Message).filter(Message.user_id == user_id).order_by(desc(Message.created_at)).offset(skip).limit(limit).all()
+
+# Chat History Management Functions
+def get_user_chat_history(db: Session, user_id: int, skip: int = 0, limit: int = 50) -> List[ChatSession]:
+    """Get chat history for a user with message count"""
+    return db.query(ChatSession).filter(ChatSession.user_id == user_id).order_by(desc(ChatSession.updated_at)).offset(skip).limit(limit).all()
+
+def get_chat_session_with_messages(db: Session, session_id: str, user_id: int) -> Optional[ChatSession]:
+    """Get a specific chat session with all its messages"""
+    return db.query(ChatSession).filter(
+        ChatSession.session_id == session_id, 
+        ChatSession.user_id == user_id
+    ).first()
+
+def delete_chat_session(db: Session, session_id: str, user_id: int) -> bool:
+    """Delete a chat session and all its messages"""
+    # First delete all messages for this session
+    db.query(Message).filter(
+        Message.session_id == db.query(ChatSession.id).filter(
+            ChatSession.session_id == session_id,
+            ChatSession.user_id == user_id
+        ).scalar_subquery()
+    ).delete(synchronize_session=False)
+    
+    # Then delete the chat session
+    result = db.query(ChatSession).filter(
+        ChatSession.session_id == session_id,
+        ChatSession.user_id == user_id
+    ).delete()
+    
+    db.commit()
+    return result > 0
+
+def clear_user_chat_history(db: Session, user_id: int) -> bool:
+    """Clear all chat history for a user"""
+    # First delete all messages for this user
+    db.query(Message).filter(Message.user_id == user_id).delete()
+    
+    # Then delete all chat sessions for this user
+    result = db.query(ChatSession).filter(ChatSession.user_id == user_id).delete()
+    
+    db.commit()
+    return result > 0
+
+def update_chat_session_title(db: Session, session_id: str, user_id: int, title: str) -> Optional[ChatSession]:
+    """Update the title of a chat session"""
+    db_session = db.query(ChatSession).filter(
+        ChatSession.session_id == session_id,
+        ChatSession.user_id == user_id
+    ).first()
+    
+    if db_session:
+        db_session.title = title
+        db.commit()
+        db.refresh(db_session)
+    
+    return db_session
+
+def get_chat_history_with_previews(db: Session, user_id: int, skip: int = 0, limit: int = 50):
+    """Get chat history with message previews and counts"""
+    from sqlalchemy import func, text
+    
+    # Query to get chat sessions with message count and preview
+    query = db.query(
+        ChatSession,
+        func.count(Message.id).label('message_count'),
+        func.first_value(Message.content).over(
+            partition_by=ChatSession.id,
+            order_by=Message.created_at
+        ).label('first_message')
+    ).outerjoin(Message, ChatSession.id == Message.session_id)\
+     .filter(ChatSession.user_id == user_id)\
+     .group_by(ChatSession.id)\
+     .order_by(desc(ChatSession.updated_at))\
+     .offset(skip).limit(limit)
+    
+    return query.all()

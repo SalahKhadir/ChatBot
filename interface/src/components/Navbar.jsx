@@ -32,19 +32,35 @@ function Navbar({ onHistoryToggle, isHistoryOpen, onThemeToggle, isDarkMode }) {
   const handleLoginClose = () => {
     setShowLoginModal(false);
     // Check auth status in case user logged in
+    const wasAuthenticated = isAuthenticated;
     checkAuthStatus();
+    
+    // Dispatch auth change event if status changed
+    if (!wasAuthenticated && authService.isAuthenticated()) {
+      window.dispatchEvent(new CustomEvent('authChanged'));
+    }
   };
 
   const handleSignupClose = () => {
     setShowSignupModal(false);
     // Check auth status in case user signed up
+    const wasAuthenticated = isAuthenticated;
     checkAuthStatus();
+    
+    // Dispatch auth change event if status changed
+    if (!wasAuthenticated && authService.isAuthenticated()) {
+      window.dispatchEvent(new CustomEvent('authChanged'));
+    }
   };
 
   const handleLogout = () => {
     authService.logout();
     setIsAuthenticated(false);
     setUser(null);
+    
+    // Dispatch auth change event
+    window.dispatchEvent(new CustomEvent('authChanged'));
+    
     // Optionally refresh the page to clear any cached data
     window.location.reload();
   };
@@ -82,18 +98,21 @@ return (
                 <label htmlFor="themeToggle" className="theme-toggle-label"></label>
             </div>
             
-            <button 
-                className="history-button"
-                onClick={onHistoryToggle}
-                title="Chat History"
-            >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M3 3h18v18H3V3z"/>
-                    <path d="M8 7h8"/>
-                    <path d="M8 11h8"/>
-                    <path d="M8 15h5"/>
-                </svg>
-            </button>
+            {/* Only show history button for authenticated users */}
+            {isAuthenticated && (
+                <button 
+                    className="history-button"
+                    onClick={onHistoryToggle}
+                    title="Chat History"
+                >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 3h18v18H3V3z"/>
+                        <path d="M8 7h8"/>
+                        <path d="M8 11h8"/>
+                        <path d="M8 15h5"/>
+                    </svg>
+                </button>
+            )}
             
             {isAuthenticated ? (
                 <div className="user-info">

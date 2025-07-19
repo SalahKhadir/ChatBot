@@ -67,3 +67,32 @@ class ChatRequest(BaseModel):
 
 class DocumentAnalysisRequest(BaseModel):
     prompt: str
+
+# Chat History schemas
+class ChatHistoryResponse(BaseModel):
+    id: int
+    session_id: str
+    title: Optional[str]
+    preview: str
+    message_count: int
+    has_document_context: bool
+    created_at: datetime
+    updated_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+class ChatHistoryListResponse(BaseModel):
+    chat_sessions: List[ChatHistoryResponse]
+    total_count: int
+
+class ChatSessionWithMessages(BaseModel):
+    id: int
+    session_id: str
+    title: Optional[str]
+    has_document_context: bool
+    created_at: datetime
+    messages: List[MessageResponse]
+    
+    class Config:
+        from_attributes = True

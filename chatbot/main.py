@@ -10,10 +10,12 @@ from sqlalchemy.orm import Session
 
 # Import authentication and database modules
 from database import get_db, engine
-from models import User
-from schemas import UserCreate, UserLogin, UserResponse, Token
+from models import User, ChatSession, Message
+from schemas import UserCreate, UserLogin, UserResponse, Token, MessageCreate
+import schemas
 from auth import verify_password, get_password_hash, create_access_token
 from crud import get_user_by_email, create_user, get_user
+import crud
 from dependencies import get_current_user
 import models
 
@@ -78,6 +80,52 @@ async def health_check():
         "gemini_client": "connected",
         "database": "connected"
     }
+
+@app.get("/test/db")
+async def test_database(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Test database connection and user access"""
+    try:
+        # Test basic database query
+        user_count = db.query(User).count()
+        session_count = db.query(ChatSession).filter(ChatSession.user_id == current_user.id).count()
+        
+        return {
+            "status": "success",
+            "user_id": current_user.id,
+            "total_users": user_count,
+            "user_sessions": session_count
+        }
+    except Exception as e:
+        print(f"Database test error: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@app.get("/debug/stats")
+async def debug_stats(db: Session = Depends(get_db)):
+    """Debug endpoint to check database stats (no auth required)"""
+    try:
+        total_users = db.query(User).count()
+        total_sessions = db.query(ChatSession).count()
+        total_messages = db.query(Message).count()
+        
+        # Get recent sessions
+        recent_sessions = db.query(ChatSession).order_by(ChatSession.created_at.desc()).limit(5).all()
+        
+        return {
+            "total_users": total_users,
+            "total_sessions": total_sessions,
+            "total_messages": total_messages,
+            "recent_sessions": [
+                {
+                    "id": s.session_id,
+                    "title": s.title,
+                    "user_id": s.user_id,
+                    "created_at": s.created_at.isoformat()
+                } for s in recent_sessions
+            ]
+        }
+    except Exception as e:
+        print(f"Debug stats error: {e}")
+        return {"error": str(e)}
 
 # ============================================================================
 # AUTHENTICATION ENDPOINTS
@@ -190,34 +238,79 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
 async def chat_with_ai(
     message: str = Form(...), 
     session_id: str = Form(None),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Chat with AI (authenticated users only)"""
     try:
+        print(f"🔍 Chat request - User: {current_user.id}, Message: {message[:50]}...")
+        
+        # Get or create chat session
+        if session_id:
+            db_session = crud.get_chat_session(db, session_id)
+            if not db_session or db_session.user_id != current_user.id:
+                # Create new session if not found or doesn't belong to user
+                session_id = str(uuid.uuid4())
+                print(f"📝 Creating new session (existing invalid): {session_id}")
+                db_session = crud.create_chat_session(db, session_id, current_user.id)
+        else:
+            # Create new session
+            session_id = str(uuid.uuid4())
+            print(f"📝 Creating new session: {session_id}")
+            db_session = crud.create_chat_session(db, session_id, current_user.id)
+        
+        print(f"✅ Session created/found: {db_session.session_id}")
+        
+        # Save user message to database
+        user_message = MessageCreate(content=message, message_type="user")
+        print(f"💾 Saving user message to DB...")
+        user_msg_db = crud.create_message(db, user_message, current_user.id, db_session.id, False)
+        print(f"✅ User message saved with ID: {user_msg_db.id}")
+        
         # Check if there's a document session for context
+        has_document_context = False
         if session_id and session_id in document_sessions:
             response_text = await _chat_with_document_context(message, session_id)
-            return {
-                "response": response_text,
-                "session_id": session_id,
-                "has_document_context": True,
-                "user": current_user.full_name
-            }
+            has_document_context = True
         else:
             # Regular chat without document context
             response_text = await _chat_without_context(message)
-            return {
-                "response": response_text,
-                "user": current_user.full_name
-            }
+        
+        print(f"🤖 AI response generated: {response_text[:50]}...")
+        
+        # Save AI response to database
+        ai_message = MessageCreate(content=response_text, message_type="ai")
+        print(f"💾 Saving AI response to DB...")
+        ai_msg_db = crud.create_message(db, ai_message, current_user.id, db_session.id, has_document_context)
+        print(f"✅ AI message saved with ID: {ai_msg_db.id}")
+        
+        # Update session title if it's the first message
+        if not db_session.title:
+            title = message[:50] + "..." if len(message) > 50 else message
+            print(f"📝 Updating session title: {title}")
+            crud.update_chat_session_title(db, session_id, current_user.id, title)
+        
+        print(f"🎉 Chat completed successfully")
+        
+        return {
+            "response": response_text,
+            "session_id": session_id,
+            "has_document_context": has_document_context,
+            "user": current_user.full_name
+        }
+        
     except Exception as e:
+        print(f"❌ Chat error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/analyze-document")
 async def analyze_documents(
     files: List[UploadFile] = File(...),
     prompt: str = Form(...),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Analyze PDF documents with AI (authenticated users only)"""
     try:
@@ -230,8 +323,27 @@ async def analyze_documents(
         # Generate AI response
         response_text = await _analyze_documents_with_ai(file_contents, prompt, len(files))
         
-        # Store session for follow-up questions
+        # Create new session for document analysis
         session_id = str(uuid.uuid4())
+        db_session = crud.create_chat_session(db, session_id, current_user.id)
+        
+        # Update session with document context
+        document_info = {"files": file_info, "total_files": len(files)}
+        crud.update_chat_session_document_context(db, session_id, True, document_info)
+        
+        # Save user message (prompt) to database
+        user_message = MessageCreate(content=prompt, message_type="user")
+        crud.create_message(db, user_message, current_user.id, db_session.id, True)
+        
+        # Save AI response to database
+        ai_message = MessageCreate(content=response_text, message_type="ai")
+        crud.create_message(db, ai_message, current_user.id, db_session.id, True)
+        
+        # Set session title based on first user message
+        title = prompt[:50] + "..." if len(prompt) > 50 else prompt
+        crud.update_chat_session_title(db, session_id, current_user.id, title)
+        
+        # Store session for follow-up questions (in-memory for backward compatibility)
         document_sessions[session_id] = {
             'file_contents': file_contents,
             'file_info': file_info,
@@ -248,6 +360,8 @@ async def analyze_documents(
         }
         
     except Exception as e:
+        print(f"Document analysis error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================================
@@ -410,6 +524,155 @@ async def _analyze_documents_with_ai(file_contents: list, prompt: str, file_coun
     )
 
     return response.text
+
+# ============================================================================
+# CHAT HISTORY ENDPOINTS
+# ============================================================================
+
+@app.get("/chat/history", response_model=schemas.ChatHistoryListResponse)
+async def get_chat_history(
+    skip: int = 0,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get user's chat history"""
+    try:
+        # Use simpler query to avoid SQL issues
+        chat_sessions = crud.get_user_chat_sessions(db, current_user.id, skip, limit)
+        
+        history_items = []
+        for session in chat_sessions:
+            # Get message count for this session
+            message_count = db.query(Message).filter(Message.session_id == session.id).count()
+            
+            # Get first message for preview
+            first_message = db.query(Message).filter(
+                Message.session_id == session.id,
+                Message.message_type == "user"
+            ).order_by(Message.created_at).first()
+            
+            preview = "No messages"
+            if first_message:
+                preview = first_message.content[:100] + "..." if len(first_message.content) > 100 else first_message.content
+            
+            history_items.append(schemas.ChatHistoryResponse(
+                id=session.id,
+                session_id=session.session_id,
+                title=session.title or f"Chat {session.created_at.strftime('%m/%d/%Y')}",
+                preview=preview,
+                message_count=message_count,
+                has_document_context=session.has_document_context,
+                created_at=session.created_at,
+                updated_at=session.updated_at
+            ))
+        
+        return schemas.ChatHistoryListResponse(
+            chat_sessions=history_items,
+            total_count=len(history_items)
+        )
+        
+    except Exception as e:
+        print(f"Error getting chat history: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get chat history")
+
+@app.get("/chat/history/{session_id}", response_model=schemas.ChatSessionWithMessages)
+async def get_chat_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a specific chat session with all messages"""
+    try:
+        chat_session = crud.get_chat_session_with_messages(db, session_id, current_user.id)
+        
+        if not chat_session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+        
+        messages = crud.get_session_messages(db, chat_session.id)
+        
+        message_responses = [
+            schemas.MessageResponse(
+                id=msg.id,
+                message_type=msg.message_type,
+                content=msg.content,
+                has_document_context=msg.has_document_context,
+                created_at=msg.created_at
+            ) for msg in messages
+        ]
+        
+        return schemas.ChatSessionWithMessages(
+            id=chat_session.id,
+            session_id=chat_session.session_id,
+            title=chat_session.title,
+            has_document_context=chat_session.has_document_context,
+            created_at=chat_session.created_at,
+            messages=message_responses
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting chat session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get chat session")
+
+@app.delete("/chat/history/{session_id}")
+async def delete_chat_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a specific chat session"""
+    try:
+        success = crud.delete_chat_session(db, session_id, current_user.id)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+        
+        return {"message": "Chat session deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting chat session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete chat session")
+
+@app.delete("/chat/history")
+async def clear_chat_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Clear all chat history for the current user"""
+    try:
+        success = crud.clear_user_chat_history(db, current_user.id)
+        
+        return {"message": f"Chat history cleared successfully. Removed sessions: {success}"}
+        
+    except Exception as e:
+        print(f"Error clearing chat history: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear chat history")
+
+@app.put("/chat/history/{session_id}/title")
+async def update_chat_title(
+    session_id: str,
+    title: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update the title of a chat session"""
+    try:
+        updated_session = crud.update_chat_session_title(db, session_id, current_user.id, title)
+        
+        if not updated_session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+        
+        return {"message": "Chat title updated successfully", "title": title}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating chat title: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update chat title")
 
 # ============================================================================
 # SERVER STARTUP

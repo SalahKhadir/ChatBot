@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { chatService } from '../services/api';
+import { chatService, authService } from '../services/api';
 import { Navbar, HistorySidebar, TypingMessage } from '../components';
 import { useAutoScroll } from '../hooks/useAutoScroll';
+import { useChatHistory } from '../hooks/useChatHistory';
 import './Home.css';
 
 function Home() {
@@ -14,9 +15,71 @@ function Home() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [hasDocumentContext, setHasDocumentContext] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // Chat history hook (only used when authenticated)
+  const {
+    chatHistory,
+    currentChatId,
+    isLoading: isHistoryLoading,
+    startNewChat,
+    loadChatFromHistory,
+    deleteChatFromHistory,
+    clearAllHistory,
+    loadChatHistory,
+    setCurrentChatId
+  } = useChatHistory();
   
   // Auto-scroll hook
   const messagesScrollRef = useAutoScroll([chatMessages, isLoading]);
+
+  // Check authentication status on mount and when it changes
+  useEffect(() => {
+    const checkAuth = () => {
+      const authStatus = authService.isAuthenticated();
+      setIsAuthenticated(authStatus);
+      
+      if (authStatus) {
+        // User is authenticated - start new chat with history
+        const chatId = startNewChat();
+        // Reset chat state
+        setChatMessages([]);
+        setCurrentSessionId(null);
+        setHasDocumentContext(false);
+        setSelectedFiles([]);
+      } else {
+        // User is not authenticated - clear everything and hide history
+        setChatMessages([]);
+        setCurrentSessionId(null);
+        setHasDocumentContext(false);
+        setSelectedFiles([]);
+        setIsHistoryOpen(false); // Hide history sidebar for non-authenticated users
+      }
+    };
+    
+    checkAuth();
+    
+    // Listen for authentication changes (login/logout)
+    const handleAuthChange = () => checkAuth();
+    window.addEventListener('authChanged', handleAuthChange);
+    
+    return () => {
+      window.removeEventListener('authChanged', handleAuthChange);
+    };
+  }, []);
+
+  // Reload chat history periodically to keep it fresh (only when authenticated)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    const interval = setInterval(() => {
+      if (currentChatId && chatMessages.length > 0) {
+        loadChatHistory(); // Refresh history to get latest updates
+      }
+    }, 30000); // Refresh every 30 seconds if there's an active chat
+
+    return () => clearInterval(interval);
+  }, [currentChatId, chatMessages.length, loadChatHistory]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,12 +96,21 @@ function Home() {
       
       // Check if there are files selected for analysis
       if (selectedFiles.length > 0) {
-        // Use all selected files for analysis
-        response = await chatService.analyzeDocument(selectedFiles, message);
+        // Use appropriate endpoint based on authentication
+        if (isAuthenticated) {
+          response = await chatService.analyzeDocumentAuthenticated(selectedFiles, message);
+        } else {
+          response = await chatService.analyzeDocument(selectedFiles, message);
+        }
         
         // Set session context for future messages
         setCurrentSessionId(response.session_id);
         setHasDocumentContext(true);
+        
+        // Update current chat ID to match backend session (only if authenticated)
+        if (isAuthenticated) {
+          setCurrentChatId(response.session_id);
+        }
         
         // Add AI response to chat with file information
         const aiMessage = { 
@@ -55,7 +127,30 @@ function Home() {
         setSelectedFiles([]);
       } else {
         // Regular chat message (with or without document context)
-        response = await chatService.sendMessage(message, currentSessionId);
+        // Use currentSessionId if we have one (continuing conversation)
+        // or currentChatId if it's a real backend session
+        const sessionToUse = currentSessionId || (currentChatId && currentChatId.length > 20 ? currentChatId : null);
+        
+        // Use appropriate endpoint based on authentication
+        if (isAuthenticated) {
+          response = await chatService.sendAuthenticatedMessage(message, sessionToUse);
+        } else {
+          response = await chatService.sendMessage(message, sessionToUse);
+        }
+        
+        // Update session IDs from backend response (only if authenticated)
+        if (isAuthenticated && response.session_id) {
+          setCurrentSessionId(response.session_id);
+          setCurrentChatId(response.session_id);
+        } else if (!isAuthenticated && response.session_id) {
+          // For non-authenticated users, only store session ID locally for document context
+          setCurrentSessionId(response.session_id);
+        }
+        
+        // Update document context status
+        if (response.has_document_context !== undefined) {
+          setHasDocumentContext(response.has_document_context);
+        }
         
         // Add AI response to chat
         const aiMessage = { 
@@ -65,6 +160,15 @@ function Home() {
           hasDocumentContext: response.has_document_context || false
         };
         setChatMessages(prev => [...prev, aiMessage]);
+      }
+      
+      // Refresh chat history after sending message (only for authenticated users)
+      if (isAuthenticated) {
+        setTimeout(() => {
+          if (loadChatHistory) {
+            loadChatHistory();
+          }
+        }, 500); // Give the backend time to save the message
       }
       
       setMessage('');
@@ -93,7 +197,10 @@ function Home() {
   };
 
   const handleHistoryToggle = () => {
-    setIsHistoryOpen(!isHistoryOpen);
+    // Only allow history toggle for authenticated users
+    if (isAuthenticated) {
+      setIsHistoryOpen(!isHistoryOpen);
+    }
   };
 
   const handleHistoryClose = () => {
@@ -104,6 +211,57 @@ function Home() {
     setIsDarkMode(!isDarkMode);
   };
 
+  // Chat history handlers
+  const handleChatSelect = async (chat) => {
+    try {
+      const loadedChat = await loadChatFromHistory(chat.id);
+      if (loadedChat) {
+        setChatMessages(loadedChat.messages);
+        // Set the session ID to the loaded chat ID for continuing conversation
+        setCurrentSessionId(chat.id);
+        // Reset other state
+        setHasDocumentContext(loadedChat.messages.some(msg => msg.hasDocumentContext));
+        setSelectedFiles([]);
+        setIsHistoryOpen(false);
+      }
+    } catch (error) {
+      console.error('Error loading chat:', error);
+    }
+  };
+
+  const handleNewChat = () => {
+    const newChatId = startNewChat();
+    // Reset all chat state
+    setChatMessages([]);
+    setCurrentSessionId(null);
+    setHasDocumentContext(false);
+    setSelectedFiles([]);
+    setIsHistoryOpen(false);
+  };
+
+  const handleDeleteChat = async (chatId) => {
+    try {
+      await deleteChatFromHistory(chatId);
+      // If we're deleting the current chat, start a new one
+      if (chatId === currentChatId) {
+        handleNewChat();
+      }
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    if (confirm('Are you sure you want to clear all chat history? This action cannot be undone.')) {
+      try {
+        await clearAllHistory();
+        handleNewChat();
+      } catch (error) {
+        console.error('Error clearing history:', error);
+      }
+    }
+  };
+
   return (
     <>
       <Navbar 
@@ -112,11 +270,21 @@ function Home() {
         onThemeToggle={handleThemeToggle}
         isDarkMode={isDarkMode}
       />
-      <HistorySidebar 
-        isOpen={isHistoryOpen} 
-        onClose={handleHistoryClose}
-        isDarkMode={isDarkMode}
-      />
+      {/* Only show history sidebar for authenticated users */}
+      {isAuthenticated && (
+        <HistorySidebar 
+          isOpen={isHistoryOpen} 
+          onClose={handleHistoryClose}
+          isDarkMode={isDarkMode}
+          onChatSelect={handleChatSelect}
+          onNewChat={handleNewChat}
+          chatHistory={chatHistory}
+          currentChatId={currentChatId}
+          onDeleteChat={handleDeleteChat}
+          onClearHistory={handleClearHistory}
+          isLoading={isHistoryLoading}
+        />
+      )}
       
       <div className={`home-container ${chatMessages.length > 0 ? 'chat-mode' : ''} ${isDarkMode ? 'dark-theme' : 'light-theme'}`}>
         <div className={`home-content ${chatMessages.length > 0 ? 'chat-mode' : ''}`}>
