@@ -10,22 +10,20 @@ const TypingMessage = ({ content, isLatestMessage = false }) => {
 
   const textToShow = isLatestMessage ? displayedText : content;
 
+  // If typing, add cursor directly to the text content
+  if (isTyping && isLatestMessage) {
+    const textWithCursor = textToShow + '<span class="typing-cursor">|</span>';
+    return (
+      <div className="message-text">
+        <ReactMarkdown>{textToShow}</ReactMarkdown>
+        <span className="typing-cursor">|</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="message-text" style={{ position: 'relative' }}>
+    <div className="message-text">
       <ReactMarkdown>{textToShow}</ReactMarkdown>
-      {isTyping && isLatestMessage && (
-        <span 
-          className="typing-cursor" 
-          style={{ 
-            position: 'absolute', 
-            right: '0', 
-            bottom: '0',
-            transform: 'translateY(-2px)'
-          }}
-        >
-          |
-        </span>
-      )}
     </div>
   );
 };

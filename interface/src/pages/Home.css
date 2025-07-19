@@ -367,7 +367,8 @@
   color: #fb1b23;
   font-weight: bold;
   animation: blink 1s infinite;
-  margin-left: 2px;
+  display: inline;
+  margin-left: 1px;
 }
 
 /* Inline cursor styling for markdown */
