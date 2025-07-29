@@ -16,6 +16,7 @@ function Home() {
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [hasDocumentContext, setHasDocumentContext] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeSection, setActiveSection] = useState(null); // Track which section is active
   
   // Chat history hook (only used when authenticated)
   const {
@@ -125,6 +126,29 @@ function Home() {
         
         // Clear selected files after analysis
         setSelectedFiles([]);
+      } else if (isAuthenticated && activeSection === 'research') {
+        // Use secure folder analysis for authenticated users in research section
+        response = await chatService.analyzeSecureFolder(message);
+        
+        // Set session context for future messages
+        setCurrentSessionId(response.session_id);
+        setHasDocumentContext(true);
+        setCurrentChatId(response.session_id);
+        
+        // Add AI response to chat with secure folder information
+        const aiMessage = { 
+          type: 'ai', 
+          content: response.response, 
+          timestamp: new Date(),
+          filesProcessed: response.files_processed,
+          totalFiles: response.total_files,
+          sessionId: response.session_id,
+          source: 'secure_folder'
+        };
+        setChatMessages(prev => [...prev, aiMessage]);
+        
+        // Reset active section after analysis
+        setActiveSection(null);
       } else {
         // Regular chat message (with or without document context)
         // Use currentSessionId if we have one (continuing conversation)
@@ -196,6 +220,78 @@ function Home() {
     document.getElementById('fileInput').click();
   };
 
+  // Section handlers
+  const handleCreativeWriting = () => {
+    setActiveSection('creative');
+    setMessage('I need help with creative writing. Please suggest what type of content you can help me create.');
+    // Auto-focus on input
+    setTimeout(() => {
+      document.querySelector('.message-input').focus();
+    }, 100);
+  };
+
+  const handleCodeDevelopment = () => {
+    setActiveSection('code');
+    setMessage('I need help with code development. Please tell me what programming assistance you can provide.');
+    setTimeout(() => {
+      document.querySelector('.message-input').focus();
+    }, 100);
+  };
+
+  const handleProblemSolving = () => {
+    setActiveSection('problem');
+    setMessage('I have a problem that needs solving. Please guide me on how you can help break it down step by step.');
+    setTimeout(() => {
+      document.querySelector('.message-input').focus();
+    }, 100);
+  };
+
+  const handleResearchAnalysis = () => {
+    setActiveSection('research');
+    if (isAuthenticated) {
+      // For authenticated users, prompt for secure folder analysis
+      setMessage('Please describe what type of CV analysis you need from the secure folder.');
+    } else {
+      // For non-authenticated users, show file upload
+      triggerFileInput();
+    }
+  };
+
+  // Quick prompt templates
+  const quickPrompts = {
+    creative: [
+      "Write a compelling property description for a luxury villa in Marrakech",
+      "Create a blog post about Morocco's luxury real estate market trends",
+      "Generate marketing copy for a golf community development",
+      "Write an engaging social media post about CGI's heritage"
+    ],
+    code: [
+      "Review my React component code for best practices",
+      "Help me debug a JavaScript API integration issue",
+      "Design a database schema for a property management system",
+      "Create a Python script for real estate data analysis"
+    ],
+    problem: [
+      "Analyze the pros and cons of investing in Moroccan real estate",
+      "Break down the steps to launch a new property development",
+      "Help me create a strategic plan for digital marketing",
+      "Solve a complex business decision with multiple variables"
+    ],
+    research: [
+      "Analyze CVs for a specific role and rank candidates by suitability",
+      "Compare candidate skills and experience for senior positions",
+      "Extract key qualifications and technical skills from resumes",
+      "Provide detailed candidate recommendations with strengths and gaps"
+    ]
+  };
+
+  const handleQuickPrompt = (prompt) => {
+    setMessage(prompt);
+    setTimeout(() => {
+      document.querySelector('.message-input').focus();
+    }, 100);
+  };
+
   const handleHistoryToggle = () => {
     // Only allow history toggle for authenticated users
     if (isAuthenticated) {
@@ -216,7 +312,13 @@ function Home() {
     try {
       const loadedChat = await loadChatFromHistory(chat.id);
       if (loadedChat) {
-        setChatMessages(loadedChat.messages);
+        // Mark all loaded messages as from history to skip typing animation
+        const messagesWithHistoryFlag = loadedChat.messages.map(msg => ({
+          ...msg,
+          isFromHistory: true // Add flag to indicate this message is from history
+        }));
+        
+        setChatMessages(messagesWithHistoryFlag);
         // Set the session ID to the loaded chat ID for continuing conversation
         setCurrentSessionId(chat.id);
         // Reset other state
@@ -300,32 +402,77 @@ function Home() {
             </div>
 
             <div className="suggestions-grid">
-              <div className="suggestion-card">
+              <div className={`suggestion-card ${activeSection === 'creative' ? 'active' : ''}`} onClick={handleCreativeWriting}>
                 <div className="suggestion-icon">💡</div>
                 <h3>Creative Writing</h3>
                 <p>Help with stories, essays, and creative content</p>
+                <div className="card-examples">
+                  <small>• Property descriptions • Marketing copy • Blog posts</small>
+                </div>
               </div>
-              <div className="suggestion-card" onClick={triggerFileInput}>
+              <div className={`suggestion-card ${activeSection === 'research' ? 'active' : ''}`} onClick={handleResearchAnalysis}>
                 <div className="suggestion-icon">🔍</div>
                 <h3>Research & Analysis</h3>
-                <p>Upload multiple PDFs for comprehensive analysis</p>
+                {isAuthenticated ? (
+                  <p>Analyze CVs from secure folder with confidential access</p>
+                ) : (
+                  <p>Upload multiple PDFs for comprehensive analysis</p>
+                )}
                 {selectedFiles.length > 0 && (
                   <div className="selected-files">
                     <p className="files-count">{selectedFiles.length} file(s) selected</p>
                   </div>
                 )}
+                <div className="card-examples">
+                  {isAuthenticated ? (
+                    <small>• CV analysis • Candidate ranking • Skills extraction</small>
+                  ) : (
+                    <small>• Document analysis • Data extraction • Summarization</small>
+                  )}
+                </div>
               </div>
-              <div className="suggestion-card">
+              <div className={`suggestion-card ${activeSection === 'code' ? 'active' : ''}`} onClick={handleCodeDevelopment}>
                 <div className="suggestion-icon">💻</div>
                 <h3>Code & Development</h3>
                 <p>Programming help and code reviews</p>
+                <div className="card-examples">
+                  <small>• Code review • Bug fixing • API development</small>
+                </div>
               </div>
-              <div className="suggestion-card">
+              <div className={`suggestion-card ${activeSection === 'problem' ? 'active' : ''}`} onClick={handleProblemSolving}>
                 <div className="suggestion-icon">🎯</div>
                 <h3>Problem Solving</h3>
                 <p>Break down complex problems step by step</p>
+                <div className="card-examples">
+                  <small>• Business analysis • Technical troubleshooting • Strategy</small>
+                </div>
               </div>
             </div>
+
+            {/* Quick Prompts Section */}
+            {activeSection && !(activeSection === 'research' && !isAuthenticated) && (
+              <div className="quick-prompts-section">
+                <h3>Quick Start Prompts</h3>
+                <div className="quick-prompts-grid">
+                  {quickPrompts[activeSection]?.map((prompt, index) => (
+                    <div 
+                      key={index} 
+                      className="quick-prompt-card"
+                      onClick={() => handleQuickPrompt(prompt)}
+                    >
+                      <span className="prompt-icon">💡</span>
+                      <p>{prompt}</p>
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  className="clear-selection-btn"
+                  onClick={() => setActiveSection(null)}
+                >
+                  ← Back to all sections
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <div ref={messagesScrollRef} className={`chat-messages ${chatMessages.length > 0 ? 'fullscreen' : ''}`}>
@@ -337,7 +484,11 @@ function Home() {
                   {msg.filesProcessed && (
                     <div className="message-files">
                       <div className="files-header">
-                        📄 Analyzed {msg.totalFiles} document{msg.totalFiles > 1 ? 's' : ''}:
+                        {msg.source === 'secure_folder' ? (
+                          <span>� Analyzed {msg.totalFiles} confidential document{msg.totalFiles > 1 ? 's' : ''} from secure folder:</span>
+                        ) : (
+                          <span>�📄 Analyzed {msg.totalFiles} document{msg.totalFiles > 1 ? 's' : ''}:</span>
+                        )}
                       </div>
                       <div className="files-list">
                         {msg.filesProcessed.map((file, fileIndex) => (
@@ -357,10 +508,18 @@ function Home() {
                     </div>
                   )}
                   {msg.type === 'ai' ? (
-                    <TypingMessage 
-                      content={msg.content} 
-                      isLatestMessage={index === chatMessages.length - 1}
-                    />
+                    msg.isFromHistory ? (
+                      // For messages loaded from history, show instantly without typing animation
+                      <div className="message-text">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      // For new messages, use typing animation
+                      <TypingMessage 
+                        content={msg.content} 
+                        isLatestMessage={index === chatMessages.length - 1}
+                      />
+                    )
                   ) : (
                     <div className="message-text">{msg.content}</div>
                   )}

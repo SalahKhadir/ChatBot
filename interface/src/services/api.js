@@ -115,6 +115,24 @@ export const chatService = {
     }
     
     return response.json();
+  },
+
+  // Analyze documents from secure folder (authenticated users only)
+  async analyzeSecureFolder(prompt) {
+    const formData = new FormData();
+    formData.append('prompt', prompt);
+    
+    const response = await fetch(`${API_BASE_URL}/analyze-secure-folder`, {
+      method: 'POST',
+      body: formData,
+      headers: createHeaders(true),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to analyze secure folder documents');
+    }
+    
+    return response.json();
   }
 };
 

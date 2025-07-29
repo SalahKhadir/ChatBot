@@ -53,8 +53,14 @@ try:
 except Exception as e:
     raise Exception(f"Failed to initialize Gemini client: {e}")
 
-# CGI System Instruction
+# CGI System Instructions for different sections
 CGI_SYSTEM_INSTRUCTION = """You are a professional AI assistant for CGI (Compagnie générale immobilière), Morocco's leading real estate company since 1960. You specialize in luxury properties, golf communities, and investment opportunities. Always respond professionally and mention CGI's expertise."""
+
+CGI_CREATIVE_WRITING_INSTRUCTION = """You are a creative writing specialist for CGI Real Estate. Help create compelling property descriptions, marketing copy, blog posts, and creative content related to luxury real estate, golf communities, and Moroccan properties. Focus on elegant, persuasive language that highlights CGI's premium offerings and 60+ years of expertise."""
+
+CGI_CODE_DEVELOPMENT_INSTRUCTION = """You are a senior software developer and code reviewer specializing in real estate technology solutions. Help with code analysis, debugging, API development, database design, and web development. Provide practical solutions for real estate applications, property management systems, and modern web technologies."""
+
+CGI_PROBLEM_SOLVING_INSTRUCTION = """You are a strategic consultant and problem-solving expert for CGI Real Estate. Break down complex business problems, provide step-by-step analysis, offer multiple solution approaches, and help with decision-making processes. Focus on real estate market analysis, investment strategies, and business optimization."""
 
 # In-memory storage for document sessions
 document_sessions = {}
@@ -422,17 +428,134 @@ async def analyze_documents_public(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/analyze-secure-folder")
+async def analyze_secure_folder(
+    prompt: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Analyze CVs from secure folder (authenticated users only)"""
+    try:
+        # Define the secure folder path (you can configure this as an environment variable)
+        SECURE_FOLDER_PATH = os.getenv("SECURE_CV_FOLDER_PATH", "C:/secure/cvs")
+        
+        if not os.path.exists(SECURE_FOLDER_PATH):
+            raise HTTPException(status_code=404, detail="Secure folder not found")
+        
+        # Get all PDF files from the secure folder
+        pdf_files = []
+        for filename in os.listdir(SECURE_FOLDER_PATH):
+            if filename.lower().endswith('.pdf'):
+                pdf_files.append(os.path.join(SECURE_FOLDER_PATH, filename))
+        
+        if not pdf_files:
+            raise HTTPException(status_code=404, detail="No PDF files found in secure folder")
+        
+        # Read and process the PDF files
+        file_contents = []
+        file_info = []
+        
+        for file_path in pdf_files:
+            try:
+                with open(file_path, 'rb') as f:
+                    file_content = f.read()
+                    file_contents.append(file_content)
+                    file_info.append({
+                        "filename": os.path.basename(file_path),
+                        "size": len(file_content)
+                    })
+            except Exception as e:
+                print(f"Error reading file {file_path}: {e}")
+                continue
+        
+        if not file_contents:
+            raise HTTPException(status_code=500, detail="Failed to read any files from secure folder")
+        
+        # Generate AI response with CV analysis focus
+        cv_analysis_prompt = f"""
+        You are analyzing CVs from a confidential recruitment process. Please provide:
+        
+        User Request: {prompt}
+        
+        Guidelines for CV Analysis:
+        - Maintain confidentiality and professionalism
+        - Focus on relevant skills, experience, and qualifications
+        - Provide comparative analysis when requested
+        - Respect privacy by not revealing personal details unless specifically asked
+        - Summarize key findings and recommendations
+        
+        Please analyze the CVs and respond to the user's request.
+        """
+        
+        response_text = await _analyze_documents_with_ai(file_contents, cv_analysis_prompt, len(file_contents))
+        
+        # Create new session for document analysis
+        session_id = str(uuid.uuid4())
+        db_session = crud.create_chat_session(db, session_id, current_user.id)
+        
+        # Update session with document context
+        document_info = {"files": file_info, "total_files": len(file_contents), "source": "secure_folder"}
+        crud.update_chat_session_document_context(db, session_id, True, document_info)
+        
+        # Save user message (prompt) to database
+        user_message = MessageCreate(content=prompt, message_type="user")
+        crud.create_message(db, user_message, current_user.id, db_session.id, True)
+        
+        # Save AI response to database
+        ai_message = MessageCreate(content=response_text, message_type="ai")
+        crud.create_message(db, ai_message, current_user.id, db_session.id, True)
+        
+        # Set session title based on first user message
+        title = f"CV Analysis: {prompt[:30]}..." if len(prompt) > 30 else f"CV Analysis: {prompt}"
+        crud.update_chat_session_title(db, session_id, current_user.id, title)
+        
+        # Store session for follow-up questions (in-memory for backward compatibility)
+        document_sessions[session_id] = {
+            'file_contents': file_contents,
+            'file_info': file_info,
+            'conversation_history': [f"User: {prompt}", f"Assistant: {response_text}"],
+            'user_id': current_user.id,
+            'source': 'secure_folder'
+        }
+
+        return {
+            "response": response_text,
+            "files_processed": file_info,
+            "total_files": len(file_contents),
+            "session_id": session_id,
+            "source": "secure_folder"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in secure folder analysis: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
 async def _chat_without_context(message: str) -> str:
-    """Generate AI response without document context using CGI system instruction"""
+    """Generate AI response without document context using appropriate system instruction"""
+    
+    # Detect the type of request based on message content
+    message_lower = message.lower()
+    
+    if any(keyword in message_lower for keyword in ['creative writing', 'content', 'story', 'essay', 'blog', 'marketing', 'property description']):
+        system_instruction = CGI_CREATIVE_WRITING_INSTRUCTION
+    elif any(keyword in message_lower for keyword in ['code', 'programming', 'development', 'debug', 'api', 'database', 'script']):
+        system_instruction = CGI_CODE_DEVELOPMENT_INSTRUCTION
+    elif any(keyword in message_lower for keyword in ['problem', 'solving', 'solution', 'analysis', 'strategy', 'decision', 'step by step']):
+        system_instruction = CGI_PROBLEM_SOLVING_INSTRUCTION
+    else:
+        system_instruction = CGI_SYSTEM_INSTRUCTION
+    
     response = gemini_client.models.generate_content(
         model="gemini-2.0-flash-exp",
         contents=[message],
         config=types.GenerateContentConfig(
-            system_instruction=CGI_SYSTEM_INSTRUCTION
+            system_instruction=system_instruction
         )
     )
     return response.text
