@@ -18,6 +18,8 @@ An intelligent conversational AI assistant designed specifically for CGI (Compag
 - **PDF Document Processing**: Upload and analyze multiple PDF documents simultaneously
 - **Intelligent Extraction**: AI-powered content analysis and question-answering
 - **Document Context Preservation**: Maintains document context across conversation sessions
+- **🔒 Secure CV Analysis**: Authenticated users can analyze CVs from protected secure folders
+- **Dual Analysis Modes**: Public document upload vs. secure folder access for confidential files
 
 ### 👤 User Management & Authentication
 - **JWT-Based Authentication**: Secure user login and registration system
@@ -34,7 +36,35 @@ An intelligent conversational AI assistant designed specifically for CGI (Compag
 - **Public Access**: Basic chat functionality without data persistence
 - **Authenticated Access**: Full feature set with history, document analysis, and data saving
 
-## 🏗️ Architecture
+### 🎨 Enhanced User Experience
+- **Interactive Section Cards**: Visual toggle effects and hover animations for section selection
+- **Active State Feedback**: Real-time visual indicators for selected sections with red accent theme
+- **Conditional UI Elements**: Dynamic interface adaptation based on authentication status
+- **Quick Start Prompts**: Context-aware prompt suggestions for each section (hidden for non-authenticated secure analysis)
+- **Smooth Animations**: Polished transitions and micro-interactions throughout the interface
+
+## � Latest Features & Improvements
+
+### 🔐 Secure CV Analysis System
+- **Protected Folder Access**: Authenticated users can analyze CVs from secure, protected folders
+- **Environment-Configured Paths**: Secure folder location managed via `SECURE_CV_FOLDER_PATH` environment variable
+- **Authentication-Gated**: Secure analysis features only available to logged-in users
+- **Confidential Processing**: Specialized endpoint (`/analyze-secure-folder`) for sensitive document analysis
+
+### 🎨 Enhanced Visual Experience
+- **Section Toggle Effects**: Interactive cards with active state styling and hover-like animations
+- **Red Accent Theme**: Consistent `#fb1b23` color scheme throughout the interface
+- **Conditional Prompt Display**: Quick start prompts intelligently hidden for restricted features
+- **Elevation Effects**: Cards lift and transform when selected for better user feedback
+- **Theme Support**: Full light/dark mode compatibility for all new visual elements
+
+### 🔄 Smart UI Adaptation
+- **Authentication-Aware Interface**: UI elements automatically adapt based on login status
+- **Contextual Feature Access**: Different capabilities shown to public vs. authenticated users
+- **Progressive Enhancement**: Basic functionality for all users, premium features for authenticated accounts
+- **Intelligent Fallbacks**: Graceful degradation when advanced features aren't available
+
+## �🏗️ Architecture
 
 ### Backend (FastAPI)
 ```
@@ -105,6 +135,7 @@ Create `.env` file in the `chatbot` directory:
 GEMINI_API_KEY=your_gemini_api_key_here
 DATABASE_URL=mysql+pymysql://username:password@localhost/chatbot_db
 SECRET_KEY=your_jwt_secret_key_here
+SECURE_CV_FOLDER_PATH=C:/secure/cvs
 ```
 
 5. **Database setup**
@@ -149,6 +180,7 @@ npm run dev
 - `POST /chat/public` - Public chat (no persistence)
 - `POST /analyze-document` - Authenticated document analysis
 - `POST /analyze-document/public` - Public document analysis
+- `POST /analyze-secure-folder` - **NEW**: Secure CV analysis from protected folders (authenticated only)
 
 ### Chat History Endpoints
 - `GET /chat/history` - Get user's chat history
@@ -191,23 +223,30 @@ npm run dev
 GEMINI_API_KEY=          # Google Gemini API key
 DATABASE_URL=            # MySQL connection string
 SECRET_KEY=              # JWT signing secret
+SECURE_CV_FOLDER_PATH=   # Path to secure CV folder (for authenticated analysis)
 ```
 
 ## 📱 User Experience
 
 ### For Public Users
 - ✅ Basic chat functionality
-- ✅ PDF document analysis
+- ✅ PDF document analysis (via file upload)
+- ✅ **Interactive section cards** with visual feedback
+- ✅ **Quick start prompts** for creative writing, coding, and problem-solving
 - ❌ No chat history (sessions are temporary)
 - ❌ No data persistence
+- ❌ **No secure folder access** or confidential CV analysis
 
 ### For Authenticated Users
 - ✅ Full chat functionality with AI responses
 - ✅ PDF document analysis with context preservation
+- ✅ **Secure CV folder analysis** with protected file access
 - ✅ Persistent chat history with ChatGPT-style sidebar
 - ✅ Session management (create, delete, clear)
 - ✅ Real-time history updates
-- ✅ Personalized experience
+- ✅ **Enhanced visual feedback** with active section states
+- ✅ **Context-aware prompt suggestions** for all sections
+- ✅ Personalized experience with full feature access
 
 ## 🚦 Development Workflow
 
