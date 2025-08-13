@@ -210,3 +210,293 @@ export const authService = {
     return userData ? JSON.parse(userData) : null;
   }
 };
+
+// Admin API service
+export const adminAPI = {
+  // Get all users with statistics
+  async getAllUsers() {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/users`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch users');
+    }
+    
+    return await response.json();
+  },
+
+  // Get platform statistics
+  async getPlatformStats() {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/stats`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch stats');
+    }
+    
+    return await response.json();
+  },
+
+  // Update user role
+  async updateUserRole(userId, newRole) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/role`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ role: newRole }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update user role');
+    }
+    
+    return await response.json();
+  },
+
+  // Update user status (active/inactive)
+  async updateUserStatus(userId, isActive) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ is_active: isActive }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update user status');
+    }
+    
+    return await response.json();
+  },
+
+  // Delete user account
+  async deleteUser(userId) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to delete user');
+    }
+    
+    return await response.json();
+  },
+
+  // Check if current user is admin
+  isCurrentUserAdmin() {
+    const userData = authService.getStoredUserData();
+    return userData && userData.role === 'admin';
+  },
+
+  // Update user profile (for current user)
+  async updateUserProfile(userId, profileData) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/profile`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(profileData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to update profile');
+    }
+    
+    return await response.json();
+  },
+
+  // Change user password (for current user)
+  async changeUserPassword(userId, passwordData) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/password`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(passwordData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to change password');
+    }
+    
+    return await response.json();
+  },
+
+  // Secure Folder Management
+
+  // Get all secure folders and their contents
+  async getSecureFolders() {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/secure-folders`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch secure folders');
+    }
+    
+    return await response.json();
+  },
+
+  // Upload files to secure folder
+  async uploadToSecureFolder(files, folderName = 'default') {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const formData = new FormData();
+    if (Array.isArray(files)) {
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+    } else {
+      formData.append('files', files);
+    }
+    formData.append('folder_name', folderName);
+
+    const response = await fetch(`${API_BASE_URL}/admin/secure-folders/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to upload files to secure folder');
+    }
+    
+    return await response.json();
+  },
+
+  // Delete file from secure folder
+  async deleteFromSecureFolder(filename, folderName = 'default') {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/secure-folders/delete`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        filename: filename,
+        folder_name: folderName 
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to delete file from secure folder');
+    }
+    
+    return await response.json();
+  },
+
+  // Get user permissions for secure folder access
+  async getSecureFolderPermissions() {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/secure-folders/permissions`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch secure folder permissions');
+    }
+    
+    return await response.json();
+  },
+
+  // Update user permissions for secure folder access
+  async updateSecureFolderPermissions(userId, hasAccess) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/secure-folders/permissions`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        user_id: userId,
+        has_access: hasAccess 
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update secure folder permissions');
+    }
+    
+    return await response.json();
+  },
+
+  // Check if current user has permission to access secure folder
+  async checkSecureFolderPermission() {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/user/secure-folder/permission`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to check secure folder permission');
+    }
+    
+    return await response.json();
+  }
+};

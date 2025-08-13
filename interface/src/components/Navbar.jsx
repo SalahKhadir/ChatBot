@@ -1,18 +1,31 @@
 import { useState, useEffect } from 'react';
-import { authService } from '../services/api';
+import { authService, adminAPI } from '../services/api';
 import './Navbar.css';
 import Login from './Login';
 import Signup from './Signup';
+import Profile from './Profile';
 
-function Navbar({ onHistoryToggle, isHistoryOpen, onThemeToggle, isDarkMode }) {
+function Navbar({ onHistoryToggle, isHistoryOpen, onThemeToggle, isDarkMode, onNavigate }) {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
 
   // Check authentication status on component mount
   useEffect(() => {
     checkAuthStatus();
+    
+    // Listen for profile updates
+    const handleProfileUpdate = (event) => {
+      setUser(event.detail);
+    };
+    
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+    
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+    };
   }, []);
 
   const checkAuthStatus = () => {
@@ -22,6 +35,8 @@ function Navbar({ onHistoryToggle, isHistoryOpen, onThemeToggle, isDarkMode }) {
     if (isLoggedIn) {
       const userData = authService.getStoredUserData();
       setUser(userData);
+    } else {
+      setUser(null);
     }
   };
 
@@ -75,6 +90,14 @@ function Navbar({ onHistoryToggle, isHistoryOpen, onThemeToggle, isDarkMode }) {
     setShowLoginModal(true);
   };
 
+  const handleProfileClick = () => {
+    setShowProfileModal(true);
+  };
+
+  const handleProfileClose = () => {
+    setShowProfileModal(false);
+  };
+
 return (
     <>
     <nav className={`navbar ${isDarkMode ? 'dark-theme' : 'light-theme'}`}>
@@ -113,9 +136,39 @@ return (
                     </svg>
                 </button>
             )}
+
+            {/* Admin panel button - only for admins */}
+            {isAuthenticated && user?.role === 'admin' && (
+                <button 
+                    className="admin-button"
+                    onClick={() => {
+                        window.history.pushState(null, '', '/admin');
+                        if (onNavigate) onNavigate('admin');
+                    }}
+                    title="Admin Panel"
+                >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                        <path d="m9 12 2 2 4-4"/>
+                    </svg>
+                </button>
+            )}
+            
             
             {isAuthenticated ? (
                 <div className="user-info">
+                    {/* Profile button */}
+                    <button 
+                        className="profile-button"
+                        onClick={handleProfileClick}
+                        title="Profile Settings"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </button>
+                    
                     <span className="welcome-text">
                         Welcome, {user?.full_name || 'User'}!
                     </span>
@@ -154,6 +207,13 @@ return (
         onClose={handleSignupClose} 
         isDarkMode={isDarkMode}
         onSwitchToLogin={handleSwitchToLogin}
+      />
+    )}
+    
+    {showProfileModal && (
+      <Profile 
+        onClose={handleProfileClose} 
+        isDarkMode={isDarkMode}
       />
     )}
     </>

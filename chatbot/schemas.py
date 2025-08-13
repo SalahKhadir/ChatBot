@@ -1,6 +1,12 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
+from enum import Enum
+
+# User role enum
+class UserRole(str, Enum):
+    USER = "user"
+    ADMIN = "admin"
 
 # User schemas
 class UserCreate(BaseModel):
@@ -16,8 +22,27 @@ class UserResponse(BaseModel):
     id: int
     email: str
     full_name: str
+    role: UserRole
     is_active: bool
     created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
+
+class UserManagement(BaseModel):
+    id: int
+    email: str
+    full_name: str
+    role: UserRole
+    is_active: bool
+    created_at: datetime
+    total_sessions: Optional[int] = 0
+    total_messages: Optional[int] = 0
     
     class Config:
         from_attributes = True

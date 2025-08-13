@@ -71,3 +71,26 @@ async def get_current_user_optional(
         return user
     except HTTPException:
         return None
+
+async def get_current_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Verify current user is admin"""
+    from models import UserRole
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user
+
+async def get_current_active_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Verify current user is active"""
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user account"
+        )
+    return current_user

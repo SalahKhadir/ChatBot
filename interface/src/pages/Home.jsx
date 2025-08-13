@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { chatService, authService } from '../services/api';
+import { chatService, authService, adminAPI } from '../services/api';
 import { Navbar, HistorySidebar, TypingMessage } from '../components';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useChatHistory } from '../hooks/useChatHistory';
 import './Home.css';
 
-function Home() {
+function Home({ onNavigate }) {
   const [message, setMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
@@ -17,6 +17,7 @@ function Home() {
   const [hasDocumentContext, setHasDocumentContext] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeSection, setActiveSection] = useState(null); // Track which section is active
+  const [notification, setNotification] = useState(null); // For showing notifications
   
   // Chat history hook (only used when authenticated)
   const {
@@ -41,6 +42,7 @@ function Home() {
       setIsAuthenticated(authStatus);
       
       if (authStatus) {
+        const userData = authService.getStoredUserData();
         // User is authenticated - start new chat with history
         const chatId = startNewChat();
         // Reset chat state
@@ -81,6 +83,12 @@ function Home() {
 
     return () => clearInterval(interval);
   }, [currentChatId, chatMessages.length, loadChatHistory]);
+
+  // Function to show notifications
+  const showNotification = (message, type = 'info') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000); // Auto-hide after 5 seconds
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -128,24 +136,41 @@ function Home() {
         setSelectedFiles([]);
       } else if (isAuthenticated && activeSection === 'research') {
         // Use secure folder analysis for authenticated users in research section
-        response = await chatService.analyzeSecureFolder(message);
-        
-        // Set session context for future messages
-        setCurrentSessionId(response.session_id);
-        setHasDocumentContext(true);
-        setCurrentChatId(response.session_id);
-        
-        // Add AI response to chat with secure folder information
-        const aiMessage = { 
-          type: 'ai', 
-          content: response.response, 
-          timestamp: new Date(),
-          filesProcessed: response.files_processed,
-          totalFiles: response.total_files,
-          sessionId: response.session_id,
-          source: 'secure_folder'
-        };
-        setChatMessages(prev => [...prev, aiMessage]);
+        try {
+          response = await chatService.analyzeSecureFolder(message);
+          
+          // Set session context for future messages
+          setCurrentSessionId(response.session_id);
+          setHasDocumentContext(true);
+          setCurrentChatId(response.session_id);
+          
+          // Add AI response to chat with secure folder information
+          const aiMessage = { 
+            type: 'ai', 
+            content: response.response, 
+            timestamp: new Date(),
+            filesProcessed: response.files_processed,
+            totalFiles: response.total_files,
+            sessionId: response.session_id,
+            source: 'secure_folder'
+          };
+          setChatMessages(prev => [...prev, aiMessage]);
+        } catch (error) {
+          // Handle permission denied or other errors
+          if (error.message.includes('403') || error.message.includes('Access denied')) {
+            const errorMessage = { 
+              type: 'ai', 
+              content: '🔒 **Access Denied**: You don\'t have permission to access the secure CV folder. Please contact an administrator to request access, or upload your own documents to analyze them.', 
+              timestamp: new Date(),
+              isError: true
+            };
+            setChatMessages(prev => [...prev, errorMessage]);
+            // Reset section to allow file upload
+            setActiveSection(null);
+          } else {
+            throw error; // Re-throw other errors to be handled by outer catch
+          }
+        }
         
         // Reset active section after analysis
         setActiveSection(null);
@@ -246,11 +271,27 @@ function Home() {
     }, 100);
   };
 
-  const handleResearchAnalysis = () => {
+  const handleResearchAnalysis = async () => {
     setActiveSection('research');
     if (isAuthenticated) {
-      // For authenticated users, prompt for secure folder analysis
-      setMessage('Please describe what type of CV analysis you need from the secure folder.');
+      try {
+        // Check if user has permission to access secure folder
+        const permissionCheck = await adminAPI.checkSecureFolderPermission();
+        
+        if (permissionCheck.has_permission) {
+          // User has permission - prompt for secure folder analysis
+          setMessage('Please describe what type of CV analysis you need from the secure folder.');
+        } else {
+          // User doesn't have permission - show file upload instead
+          showNotification("🔒 Access denied: You don't have permission to access the secure CV folder. Please upload your own documents to analyze or contact an administrator for access.", 'warning');
+          triggerFileInput();
+        }
+      } catch (error) {
+        console.error('Failed to check secure folder permission:', error);
+        // Fallback to file upload if permission check fails
+        showNotification("⚠️ Unable to verify secure folder access. Please upload your own documents to analyze.", 'error');
+        triggerFileInput();
+      }
     } else {
       // For non-authenticated users, show file upload
       triggerFileInput();
@@ -296,6 +337,7 @@ function Home() {
     // Only allow history toggle for authenticated users
     if (isAuthenticated) {
       setIsHistoryOpen(!isHistoryOpen);
+      setShowAdminPanel(false); // Close admin panel when opening history
     }
   };
 
@@ -371,7 +413,9 @@ function Home() {
         isHistoryOpen={isHistoryOpen}
         onThemeToggle={handleThemeToggle}
         isDarkMode={isDarkMode}
+        onNavigate={onNavigate}
       />
+      
       {/* Only show history sidebar for authenticated users */}
       {isAuthenticated && (
         <HistorySidebar 
@@ -414,7 +458,7 @@ function Home() {
                 <div className="suggestion-icon">🔍</div>
                 <h3>Research & Analysis</h3>
                 {isAuthenticated ? (
-                  <p>Analyze CVs from secure folder with confidential access</p>
+                  <p>Access secure CV folder (permission required) or upload documents</p>
                 ) : (
                   <p>Upload multiple PDFs for comprehensive analysis</p>
                 )}
@@ -425,7 +469,7 @@ function Home() {
                 )}
                 <div className="card-examples">
                   {isAuthenticated ? (
-                    <small>• CV analysis • Candidate ranking • Skills extraction</small>
+                    <small>• Secure CV analysis • Candidate ranking • Skills extraction</small>
                   ) : (
                     <small>• Document analysis • Data extraction • Summarization</small>
                   )}
@@ -640,6 +684,21 @@ function Home() {
         </div>
         </div>
       </div>
+
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`notification-toast ${notification.type} ${isDarkMode ? 'dark' : 'light'}`}>
+          <div className="notification-content">
+            <span className="notification-message">{notification.message}</span>
+            <button 
+              className="notification-close" 
+              onClick={() => setNotification(null)}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
