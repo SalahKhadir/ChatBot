@@ -33,6 +33,15 @@ export const chatService = {
     });
     
     if (!response.ok) {
+      if (response.status === 429) {
+        // Rate limit exceeded
+        const errorData = await response.json();
+        const error = new Error(errorData.detail.message || 'Rate limit exceeded');
+        error.rateLimitExceeded = true;
+        error.requiresLogin = errorData.detail.requires_login;
+        error.errorType = errorData.detail.type;
+        throw error;
+      }
       throw new Error('Failed to send message');
     }
     
@@ -82,6 +91,15 @@ export const chatService = {
     });
     
     if (!response.ok) {
+      if (response.status === 429) {
+        // Rate limit exceeded
+        const errorData = await response.json();
+        const error = new Error(errorData.detail.message || 'Rate limit exceeded');
+        error.rateLimitExceeded = true;
+        error.requiresLogin = errorData.detail.requires_login;
+        error.errorType = errorData.detail.type;
+        throw error;
+      }
       throw new Error('Failed to analyze document(s)');
     }
     
@@ -495,6 +513,17 @@ export const adminAPI = {
     
     if (!response.ok) {
       throw new Error('Failed to check secure folder permission');
+    }
+    
+    return await response.json();
+  },
+
+  // Check rate limit status for non-authenticated users
+  async checkRateLimitStatus() {
+    const response = await fetch(`${API_BASE_URL}/rate-limit/status`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to check rate limit status');
     }
     
     return await response.json();

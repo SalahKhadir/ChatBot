@@ -18,6 +18,12 @@ function Home({ onNavigate }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeSection, setActiveSection] = useState(null); // Track which section is active
   const [notification, setNotification] = useState(null); // For showing notifications
+  const [rateLimit, setRateLimit] = useState({
+    requests: 0,
+    files: 0,
+    maxRequests: 3,
+    maxFiles: 2
+  });
   
   // Chat history hook (only used when authenticated)
   const {
@@ -89,6 +95,30 @@ function Home({ onNavigate }) {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 5000); // Auto-hide after 5 seconds
   };
+
+  // Function to update rate limit status for anonymous users
+  const updateRateLimitStatus = async () => {
+    if (!isAuthenticated) {
+      try {
+        const status = await chatService.checkRateLimitStatus();
+        setRateLimit({
+          requests: status.requests,
+          files: status.files,
+          maxRequests: status.maxRequests,
+          maxFiles: status.maxFiles
+        });
+      } catch (error) {
+        console.error('Failed to check rate limit status:', error);
+      }
+    }
+  };
+
+  // Check rate limit status for anonymous users
+  useEffect(() => {
+    if (!isAuthenticated) {
+      updateRateLimitStatus();
+    }
+  }, [isAuthenticated]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -211,6 +241,11 @@ function Home({ onNavigate }) {
         setChatMessages(prev => [...prev, aiMessage]);
       }
       
+      // Update rate limit status for anonymous users after successful request
+      if (!isAuthenticated) {
+        updateRateLimitStatus();
+      }
+      
       // Refresh chat history after sending message (only for authenticated users)
       if (isAuthenticated) {
         setTimeout(() => {
@@ -223,12 +258,25 @@ function Home({ onNavigate }) {
       setMessage('');
     } catch (error) {
       console.error('Error:', error);
-      const errorMessage = { 
-        type: 'error', 
-        content: 'Sorry, something went wrong. Please try again.', 
-        timestamp: new Date() 
-      };
-      setChatMessages(prev => [...prev, errorMessage]);
+      
+      // Check if it's a rate limit error
+      if (error.rateLimitExceeded && error.requiresLogin) {
+        const rateLimitMessage = { 
+          type: 'ai', 
+          content: `${error.message}\n\n**[Sign In to Continue →](javascript:void(0))**\n\nGet unlimited access to our AI assistant with features like:\n• ∞ Unlimited conversations\n• 📁 Advanced document analysis\n• 🔒 Secure CV folder access (admin-approved)\n• 💾 Chat history & session management`, 
+          timestamp: new Date(),
+          isRateLimit: true,
+          requiresLogin: true
+        };
+        setChatMessages(prev => [...prev, rateLimitMessage]);
+      } else {
+        const errorMessage = { 
+          type: 'error', 
+          content: 'Sorry, something went wrong. Please try again.', 
+          timestamp: new Date() 
+        };
+        setChatMessages(prev => [...prev, errorMessage]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -521,7 +569,11 @@ function Home({ onNavigate }) {
         ) : (
           <div ref={messagesScrollRef} className={`chat-messages ${chatMessages.length > 0 ? 'fullscreen' : ''}`}>
             {chatMessages.map((msg, index) => (
-              <div key={index} className={`message ${msg.type}`}>
+              <div 
+                key={index} 
+                className={`message ${msg.type}`}
+                data-rate-limit={msg.isRateLimit || false}
+              >
                 {msg.type === 'user' && <div className="message-avatar user-avatar">You</div>}
                 {msg.type === 'ai' && <div className="message-avatar ai-avatar">AI</div>}
                 <div className="message-content">
@@ -554,15 +606,24 @@ function Home({ onNavigate }) {
                   {msg.type === 'ai' ? (
                     msg.isFromHistory ? (
                       // For messages loaded from history, show instantly without typing animation
-                      <div className="message-text">
+                      <div 
+                        className="message-text" 
+                        onClick={msg.requiresLogin ? () => onNavigate('login') : undefined}
+                        style={msg.requiresLogin ? { cursor: 'pointer' } : {}}
+                      >
                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                       </div>
                     ) : (
                       // For new messages, use typing animation
-                      <TypingMessage 
-                        content={msg.content} 
-                        isLatestMessage={index === chatMessages.length - 1}
-                      />
+                      <div 
+                        onClick={msg.requiresLogin ? () => onNavigate('login') : undefined}
+                        style={msg.requiresLogin ? { cursor: 'pointer' } : {}}
+                      >
+                        <TypingMessage 
+                          content={msg.content} 
+                          isLatestMessage={index === chatMessages.length - 1}
+                        />
+                      </div>
                     )
                   ) : (
                     <div className="message-text">{msg.content}</div>
@@ -641,6 +702,32 @@ function Home({ onNavigate }) {
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Rate limit display for anonymous users */}
+          {!isAuthenticated && chatMessages.length > 0 && (
+            <div className="rate-limit-display">
+              <div className="rate-limit-info">
+                <span className="rate-limit-counter">
+                  🤖 {rateLimit.maxRequests - rateLimit.requests} requests left
+                </span>
+                <span className="rate-limit-divider">•</span>
+                <span className="rate-limit-counter">
+                  📄 {rateLimit.maxFiles - rateLimit.files} uploads left
+                </span>
+                {(rateLimit.requests > 0 || rateLimit.files > 0) && (
+                  <>
+                    <span className="rate-limit-divider">•</span>
+                    <button 
+                      className="rate-limit-login-btn"
+                      onClick={() => onNavigate('login')}
+                    >
+                      Sign in for unlimited access
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}

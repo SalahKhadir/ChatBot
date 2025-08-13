@@ -1,11 +1,13 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from google.genai import types
 from typing import Optional, List
 import uuid
+import time
+from collections import defaultdict
 from sqlalchemy.orm import Session
 
 # Import authentication and database modules
@@ -68,6 +70,108 @@ CGI_PROBLEM_SOLVING_INSTRUCTION = """You are a strategic consultant and problem-
 document_sessions = {}
 
 # ============================================================================
+# RATE LIMITING SYSTEM
+# ============================================================================
+
+# Rate limiting configuration
+MAX_REQUESTS_PER_IP = 3
+MAX_FILES_PER_IP = 2
+RATE_LIMIT_WINDOW = 24 * 60 * 60  # 24 hours in seconds
+
+# In-memory storage for rate limiting (IP -> {requests: count, files: count, reset_time: timestamp})
+rate_limit_storage = defaultdict(lambda: {'requests': 0, 'files': 0, 'reset_time': 0})
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP address from request"""
+    # Try to get real IP from headers first (for proxy/load balancer setups)
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+    
+    # Fallback to direct client IP
+    if hasattr(request, 'client') and request.client:
+        return request.client.host
+    
+    return "unknown"
+
+def cleanup_expired_entries():
+    """Remove expired entries from rate limit storage"""
+    current_time = time.time()
+    expired_ips = [
+        ip for ip, data in rate_limit_storage.items() 
+        if current_time > data['reset_time']
+    ]
+    for ip in expired_ips:
+        del rate_limit_storage[ip]
+
+def check_rate_limit(request: Request, limit_type: str) -> dict:
+    """
+    Check rate limit for IP address
+    
+    Args:
+        request: FastAPI Request object
+        limit_type: Either 'request' or 'file'
+    
+    Returns:
+        dict with 'allowed', 'remaining', and 'reset_time' keys
+    """
+    cleanup_expired_entries()
+    
+    client_ip = get_client_ip(request)
+    current_time = time.time()
+    
+    # Get or initialize data for this IP
+    ip_data = rate_limit_storage[client_ip]
+    
+    # Reset counters if window has expired
+    if current_time > ip_data['reset_time']:
+        ip_data['requests'] = 0
+        ip_data['files'] = 0
+        ip_data['reset_time'] = current_time + RATE_LIMIT_WINDOW
+    
+    # Check limits based on type
+    if limit_type == 'request':
+        current_count = ip_data['requests']
+        max_limit = MAX_REQUESTS_PER_IP
+    elif limit_type == 'file':
+        current_count = ip_data['files']
+        max_limit = MAX_FILES_PER_IP
+    else:
+        raise ValueError("limit_type must be 'request' or 'file'")
+    
+    # Check if limit exceeded
+    if current_count >= max_limit:
+        return {
+            'allowed': False,
+            'remaining': 0,
+            'reset_time': ip_data['reset_time'],
+            'message': f"Rate limit exceeded. Maximum {max_limit} {limit_type}s allowed per 24 hours."
+        }
+    
+    return {
+        'allowed': True,
+        'remaining': max_limit - current_count,
+        'reset_time': ip_data['reset_time'],
+        'message': f"{max_limit - current_count} {limit_type}s remaining"
+    }
+
+def increment_rate_limit(request: Request, limit_type: str):
+    """Increment the rate limit counter for an IP"""
+    client_ip = get_client_ip(request)
+    if limit_type == 'request':
+        rate_limit_storage[client_ip]['requests'] += 1
+    elif limit_type == 'file':
+        rate_limit_storage[client_ip]['files'] += 1
+
+def increment_file_count(request: Request):
+    """Increment file upload count for rate limiting"""
+    increment_rate_limit(request, 'file')
+
+# ============================================================================
 # HEALTH CHECK ENDPOINTS
 # ============================================================================
 
@@ -79,6 +183,43 @@ async def root():
         "version": "2.0.0",
         "status": "healthy"
     }
+
+@app.get("/rate-limit/status")
+async def get_rate_limit_status(request: Request):
+    """Get current rate limit status for non-authenticated users"""
+    try:
+        request_check = check_rate_limit(request, "request")
+        file_check = check_rate_limit(request, "file")
+        
+        # Don't increment counters, just check status
+        client_ip = get_client_ip(request)
+        current_time = time.time()
+        
+        # Get actual current counts
+        rate_limit_storage["requests"][client_ip] = [
+            timestamp for timestamp in rate_limit_storage["requests"][client_ip]
+            if current_time - timestamp < RATE_LIMIT_WINDOW
+        ]
+        
+        request_count = len(rate_limit_storage["requests"][client_ip])
+        file_count = rate_limit_storage["files"][client_ip]
+        
+        return {
+            "requests": {
+                "used": request_count,
+                "limit": MAX_REQUESTS_PER_IP,
+                "remaining": max(0, MAX_REQUESTS_PER_IP - request_count)
+            },
+            "files": {
+                "used": file_count,
+                "limit": MAX_FILES_PER_IP,
+                "remaining": max(0, MAX_FILES_PER_IP - file_count)
+            },
+            "requires_login": request_count >= MAX_REQUESTS_PER_IP or file_count >= MAX_FILES_PER_IP,
+            "message": "Sign in for unlimited access to our AI assistant and document analysis features!"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 async def health_check():
@@ -385,39 +526,103 @@ async def analyze_documents(
 # ============================================================================
 
 @app.post("/chat/public")
-async def chat_public(message: str = Form(...), session_id: str = Form(None)):
-    """Chat with AI (public access)"""
+async def chat_public(request: Request, message: str = Form(...), session_id: str = Form(None)):
+    """Chat with AI (public access) - Rate limited"""
     try:
+        # Check rate limit for non-authenticated users
+        rate_check = check_rate_limit(request, "request")
+        if not rate_check["allowed"]:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "Rate limit exceeded",
+                    "message": rate_check["message"],
+                    "type": "rate_limit",
+                    "requires_login": True
+                }
+            )
+        
         # Check if there's a document session for context
         if session_id and session_id in document_sessions:
             response_text = await _chat_with_document_context(message, session_id)
+            
+            # Increment request counter after successful operation
+            increment_rate_limit(request, "request")
+            
             return {
                 "response": response_text,
                 "session_id": session_id,
-                "has_document_context": True
+                "has_document_context": True,
+                "rate_limit": {
+                    "remaining_requests": rate_check["remaining"] - 1,  # -1 because we just used one
+                    "message": f"{rate_check['remaining'] - 1} requests remaining before sign-in required."
+                }
             }
         else:
             # Regular chat without document context
             response_text = await _chat_without_context(message)
-            return {"response": response_text}
+            
+            # Increment request counter after successful operation
+            increment_rate_limit(request, "request")
+            
+            return {
+                "response": response_text,
+                "rate_limit": {
+                    "remaining_requests": rate_check["remaining"] - 1,  # -1 because we just used one
+                    "message": f"{rate_check['remaining'] - 1} requests remaining before sign-in required."
+                }
+            }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/analyze-document/public")
 async def analyze_documents_public(
+    request: Request,
     files: List[UploadFile] = File(...),
     prompt: str = Form(...)
 ):
-    """Analyze PDF documents with AI (public access)"""
+    """Analyze PDF documents with AI (public access) - Rate limited"""
     try:
         if not files:
             raise HTTPException(status_code=400, detail="No files provided")
+        
+        # Check file upload rate limit for non-authenticated users
+        file_rate_check = check_rate_limit(request, "file")
+        if not file_rate_check["allowed"]:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "File upload limit exceeded",
+                    "message": file_rate_check["message"],
+                    "type": "file_limit",
+                    "requires_login": True
+                }
+            )
+        
+        # Check general request rate limit
+        request_rate_check = check_rate_limit(request, "request")
+        if not request_rate_check["allowed"]:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "Rate limit exceeded",
+                    "message": request_rate_check["message"],
+                    "type": "rate_limit",
+                    "requires_login": True
+                }
+            )
         
         # Validate and process files
         file_contents, file_info = await _process_uploaded_files(files)
         
         # Generate AI response
         response_text = await _analyze_documents_with_ai(file_contents, prompt, len(files))
+        
+        # Increment counters after successful operation
+        increment_rate_limit(request, "request")
+        increment_rate_limit(request, "file")
         
         # Store session for follow-up questions
         session_id = str(uuid.uuid4())
@@ -432,7 +637,12 @@ async def analyze_documents_public(
             "response": response_text,
             "files_processed": file_info,
             "total_files": len(files),
-            "session_id": session_id
+            "session_id": session_id,
+            "rate_limit": {
+                "remaining_requests": request_rate_check["remaining"] - 1,  # -1 because we just used one
+                "remaining_files": file_rate_check["remaining"] - 1,  # -1 because we just used one
+                "message": f"Upload successful! {file_rate_check['remaining'] - 1} file uploads remaining before sign-in required."
+            }
         }
         
     except Exception as e:

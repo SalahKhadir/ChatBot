@@ -1255,3 +1255,120 @@
     max-width: none;
   }
 }
+
+/* Rate limit message styles */
+.message.ai[data-rate-limit="true"] {
+  border-left: 4px solid #ff6b35;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a1a1a 100%);
+}
+
+.message.ai[data-rate-limit="true"] .message-content {
+  background: linear-gradient(135deg, rgba(255, 107, 53, 0.1) 0%, rgba(255, 107, 53, 0.05) 100%);
+  border-radius: 10px;
+  padding: 15px;
+  position: relative;
+}
+
+.message.ai[data-rate-limit="true"] .message-content::before {
+  content: "🚦";
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  font-size: 18px;
+  opacity: 0.7;
+}
+
+.message.ai[data-rate-limit="true"] .message-text {
+  transition: all 0.2s ease;
+}
+
+.message.ai[data-rate-limit="true"] .message-text:hover {
+  background: rgba(255, 107, 53, 0.15);
+  border-radius: 8px;
+  transform: translateY(-1px);
+}
+
+.message.ai[data-rate-limit="true"] .message-text a[href="javascript:void(0)"] {
+  color: #ff6b35;
+  font-weight: bold;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.message.ai[data-rate-limit="true"] .message-text a[href="javascript:void(0)"]:hover {
+  border-bottom-color: #ff6b35;
+}
+
+/* Rate limit display styles */
+.rate-limit-display {
+  position: sticky;
+  bottom: 80px;
+  z-index: 100;
+  margin: 10px 20px;
+  padding: 10px 15px;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+  border: 1px solid #333;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.rate-limit-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #9b9b9b;
+}
+
+.rate-limit-counter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  background: rgba(255, 107, 53, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 107, 53, 0.2);
+}
+
+.rate-limit-divider {
+  color: #555;
+}
+
+.rate-limit-login-btn {
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8c60 100%);
+  color: white;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rate-limit-login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+}
+
+@media (max-width: 768px) {
+  .rate-limit-display {
+    margin: 10px;
+  }
+  
+  .rate-limit-info {
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+  }
+  
+  .rate-limit-login-btn {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+}
