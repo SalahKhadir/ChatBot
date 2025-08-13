@@ -93,6 +93,22 @@ def get_chat_session_with_messages(db: Session, session_id: str, user_id: int) -
         ChatSession.user_id == user_id
     ).first()
 
+def get_chat_session_messages(db: Session, session_id: str, user_id: int) -> List[Message]:
+    """Get messages for a specific chat session"""
+    # First get the session to verify ownership
+    session = db.query(ChatSession).filter(
+        ChatSession.session_id == session_id,
+        ChatSession.user_id == user_id
+    ).first()
+    
+    if not session:
+        return []
+    
+    # Get messages for this session
+    return db.query(Message).filter(
+        Message.session_id == session.id
+    ).order_by(Message.created_at).all()
+
 def delete_chat_session(db: Session, session_id: str, user_id: int) -> bool:
     """Delete a chat session and all its messages"""
     # First delete all messages for this session

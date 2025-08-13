@@ -151,6 +151,17 @@ export const chatService = {
     }
     
     return response.json();
+  },
+
+  // Check rate limit status for non-authenticated users
+  async checkRateLimitStatus() {
+    const response = await fetch(`${API_BASE_URL}/rate-limit/status`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to check rate limit status');
+    }
+    
+    return await response.json();
   }
 };
 
@@ -513,17 +524,6 @@ export const adminAPI = {
     
     if (!response.ok) {
       throw new Error('Failed to check secure folder permission');
-    }
-    
-    return await response.json();
-  },
-
-  // Check rate limit status for non-authenticated users
-  async checkRateLimitStatus() {
-    const response = await fetch(`${API_BASE_URL}/rate-limit/status`);
-    
-    if (!response.ok) {
-      throw new Error('Failed to check rate limit status');
     }
     
     return await response.json();
