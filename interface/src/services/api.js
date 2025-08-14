@@ -348,6 +348,83 @@ export const adminAPI = {
     return userData && userData.role === 'admin';
   },
 
+  // Advanced User Management Functions
+
+  // Search and filter users
+  async searchUsers(query = '', role = null, status = null, limit = 50) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const params = new URLSearchParams();
+    if (query) params.append('q', query);
+    if (role) params.append('role', role);
+    if (status) params.append('status', status);
+    params.append('limit', limit.toString());
+
+    const response = await fetch(`${API_BASE_URL}/admin/users/search?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to search users');
+    }
+
+    return await response.json();
+  },
+
+  // Get user activity logs
+  async getUserActivity(userId, days = 30) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/activity?days=${days}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch user activity');
+    }
+
+    return await response.json();
+  },
+
+  // Reset user password (admin function)
+  async resetUserPassword(userId, newPassword) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ new_password: newPassword }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to reset user password');
+    }
+
+    return await response.json();
+  },
+
+  // Suspend/ban user account
+  async suspendUser(userId) {
+    return this.updateUserStatus(userId, false);
+  },
+
+  // Activate user account
+  async activateUser(userId) {
+    return this.updateUserStatus(userId, true);
+  },
+
   // Update user profile (for current user)
   async updateUserProfile(userId, profileData) {
     const token = getAuthToken();

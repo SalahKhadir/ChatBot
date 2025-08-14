@@ -41,6 +41,7 @@ class UserManagement(BaseModel):
     role: UserRole
     is_active: bool
     created_at: datetime
+    last_login: Optional[datetime] = None
     total_sessions: Optional[int] = 0
     total_messages: Optional[int] = 0
     
@@ -121,3 +122,8 @@ class ChatSessionWithMessages(BaseModel):
     
     class Config:
         from_attributes = True
+
+# Secure Folder Management
+class DeleteFileRequest(BaseModel):
+    filename: str
+    folder_name: str = "default"

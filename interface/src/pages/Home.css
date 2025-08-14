@@ -16,7 +16,28 @@
   padding-top: calc(60px + 2rem);
   box-sizing: border-box;
   transition: background-color 0.3s ease, color 0.3s ease;
-  overflow: hidden; /* Remove scrolling from container */
+  overflow-y: auto; /* Allow scrolling when content exceeds viewport */
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for main container */
+.home-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.home-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.home-container::-webkit-scrollbar-thumb {
+  background: rgba(251, 27, 35, 0.6);
+  border-radius: 4px;
+}
+
+.home-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(251, 27, 35, 0.8);
 }
 
 /* Admin Panel Overlay */
@@ -50,7 +71,7 @@
   padding-top: 60px;
   justify-content: flex-start;
   height: 100vh;
-  overflow: hidden; /* Ensure no scrolling at container level */
+  overflow: hidden; /* In chat mode, only chat-messages should scroll */
 }
 
 /* Light Theme Styles */
@@ -572,7 +593,7 @@
   background: rgba(251, 27, 35, 0.8);
 }
 
-/* Light theme scrollbar */
+/* Light theme scrollbar for chat messages */
 .home-container.light-theme .chat-messages::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.1);
 }
@@ -582,6 +603,19 @@
 }
 
 .home-container.light-theme .chat-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(251, 27, 35, 0.8);
+}
+
+/* Light theme scrollbar for main container */
+.home-container.light-theme::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.home-container.light-theme::-webkit-scrollbar-thumb {
+  background: rgba(251, 27, 35, 0.6);
+}
+
+.home-container.light-theme::-webkit-scrollbar-thumb:hover {
   background: rgba(251, 27, 35, 0.8);
 }
 

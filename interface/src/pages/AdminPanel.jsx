@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { adminAPI } from '../services/api';
+import { adminAPI, authService } from '../services/api';
 import './AdminPanel.css';
 
 function AdminPanel({ onNavigate, isDarkMode }) {
@@ -11,6 +11,32 @@ function AdminPanel({ onNavigate, isDarkMode }) {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [messagesOpen, setMessagesOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('overview'); // New state for navigation
+  
+  // Advanced User Management state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userActivityOpen, setUserActivityOpen] = useState(false);
+  const [userActivity, setUserActivity] = useState(null);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  
+  // New User Modal state
+  const [newUserOpen, setNewUserOpen] = useState(false);
+  const [newUserData, setNewUserData] = useState({
+    email: '',
+    full_name: '',
+    password: '',
+    role: 'user'
+  });
+  
+  // Notification state
+  const [notification, setNotification] = useState({
+    show: false,
+    type: '', // 'success', 'error', 'info'
+    title: '',
+    message: ''
+  });
   
   // Secure Folders Management state
   const [secureFolders, setSecureFolders] = useState([]);
@@ -68,16 +94,109 @@ function AdminPanel({ onNavigate, isDarkMode }) {
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.')) {
+  // Advanced User Management Functions
+  const handleSearch = async () => {
+    try {
+      setIsLoading(true);
+      const searchResults = await adminAPI.searchUsers(
+        searchQuery.trim(),
+        roleFilter || null,
+        statusFilter || null,
+        100
+      );
+      setFilteredUsers(searchResults);
+      setError('');
+    } catch (err) {
+      setError('Erreur lors de la recherche');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setRoleFilter('');
+    setStatusFilter('');
+    setFilteredUsers([]);
+  };
+
+  // Notification helper function
+  const showNotification = (type, title, message) => {
+    setNotification({
+      show: true,
+      type,
+      title,
+      message
+    });
+    
+    // Auto-hide notification after 5 seconds
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, show: false }));
+    }, 5000);
+  };
+
+  const handleViewActivity = async (userId) => {
+    try {
+      setIsLoading(true);
+      const activityData = await adminAPI.getUserActivity(userId, 30);
+      setUserActivity(activityData);
+      setSelectedUser(users.find(u => u.id === userId));
+      setUserActivityOpen(true);
+      setError('');
+    } catch (err) {
+      setError('Erreur lors du chargement de l\'activité');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateUser = async () => {
+    if (!newUserData.email || !newUserData.full_name || !newUserData.password) {
+      setError('Veuillez remplir tous les champs requis');
+      return;
+    }
+
+    if (newUserData.password.length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
+    try {
+      await authService.register(newUserData);
+      setNewUserData({ email: '', full_name: '', password: '', role: 'user' });
+      setNewUserOpen(false);
+      await loadAdminData(); // Reload data to show new user
+      setError('');
+      showNotification('success', 'Success!', 'User created successfully');
+    } catch (err) {
+      showNotification('error', 'Error', 'Failed to create user: ' + err.message);
+      console.error(err);
+    }
+  };
+
+  const handleSuspendUser = async (userId) => {
+    if (window.confirm('Êtes-vous sûr de vouloir suspendre cet utilisateur ?')) {
       try {
-        await adminAPI.deleteUser(userId);
-        await loadAdminData(); // Reload data
+        await adminAPI.suspendUser(userId);
+        await loadAdminData();
         setError('');
       } catch (err) {
-        setError('Erreur lors de la suppression');
+        setError('Erreur lors de la suspension');
         console.error(err);
       }
+    }
+  };
+
+  const handleActivateUser = async (userId) => {
+    try {
+      await adminAPI.activateUser(userId);
+      await loadAdminData();
+      setError('');
+    } catch (err) {
+      setError('Erreur lors de l\'activation');
+      console.error(err);
     }
   };
 
@@ -119,9 +238,9 @@ function AdminPanel({ onNavigate, isDarkMode }) {
       try {
         await adminAPI.deleteFromSecureFolder(filename, folderName);
         await loadAdminData(); // Reload to get updated folder contents
-        setError('');
+        showNotification('success', 'File Deleted', `${filename} has been successfully deleted from ${folderName} folder`);
       } catch (err) {
-        setError('Erreur lors de la suppression du fichier');
+        showNotification('error', 'Delete Failed', `Failed to delete ${filename}: ${err.message}`);
         console.error(err);
       }
     }
@@ -234,106 +353,330 @@ function AdminPanel({ onNavigate, isDarkMode }) {
     </div>
   );
 
-  const renderUsersSection = () => (
-    <div className="users-section">
-      <div className="overview-header">
-        <h1>Users Management</h1>
-        <div className="header-actions">
-          <button className="add-btn-table">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Add New
-          </button>
-          <p className="overview-date">
-            {new Date().toLocaleDateString('fr-FR', { 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </p>
+  const renderUsersSection = () => {
+    const displayUsers = filteredUsers.length > 0 ? filteredUsers : users;
+    
+    return (
+      <div className="users-section">
+        <div className="overview-header">
+          <h1>Users Management</h1>
+          <div className="header-actions">
+            <button onClick={() => setNewUserOpen(true)} className="add-btn-table">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add New
+            </button>
+            <p className="overview-date">
+              {new Date().toLocaleDateString('fr-FR', { 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </p>
+          </div>
         </div>
-      </div>
-      
-      <div className="table-subtitle">
-        You can track your users and manage their roles here
-      </div>
+        
+        <div className="table-subtitle">
+          Advanced user management with search, filtering, and activity tracking
+        </div>
 
-      <div className="users-table-container">
-        <table className="users-table">
-          <thead>
-            <tr>
-              <th>
-                <div className="header-content">
-                  User Name
-                </div>
-              </th>
-              <th>
-                <div className="header-content">
-                  Email Address
-                </div>
-              </th>
-              <th>
-                <div className="header-content">
-                  Created At
-                </div>
-              </th>
-              <th>Role</th>
-              <th>Activity Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user, index) => (
-              <tr key={user.id} className="table-row">
-                <td className="user-name-cell">
-                  <div className="user-info">
-                    <div className="user-avatar">
-                      {user.full_name.charAt(0).toUpperCase()}
-                    </div>
-                    <span>{user.full_name}</span>
-                  </div>
-                </td>
-                <td className="email-cell">{user.email}</td>
-                <td className="created-cell">
-                  {new Date(user.created_at).toLocaleDateString('fr-FR', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                  })}
-                </td>
-                <td className="role-cell">
-                  <span className={`role-badge ${user.role.toLowerCase()}`}>
-                    {user.role === 'admin' ? 'Admin' : 'User'}
-                  </span>
-                </td>
-                <td className="status-cell">
-                  <div className="status-bar">
-                    <div 
-                      className={`status-fill ${user.is_active ? 'active' : 'inactive'}`}
-                      style={{ 
-                        width: user.is_active ? '100%' : '30%'
-                      }}
-                    ></div>
-                  </div>
-                </td>
-                <td className="actions-cell">
-                  <div className="checkbox-wrapper-25">
-                    <input 
-                      type="checkbox"
-                      checked={user.is_active}
-                      onChange={() => handleStatusChange(user.id, !user.is_active)}
-                      title={user.is_active ? 'Deactivate user' : 'Activate user'}
-                    />
-                  </div>
-                </td>
+        {/* Search and Filter Controls */}
+        <div className="user-controls">
+          <div className="search-section">
+            <div className="search-input-group">
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="search-input"
+              />
+              <button onClick={handleSearch} className="search-btn">
+                🔍
+              </button>
+            </div>
+            
+            <div className="filter-group">
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+              </select>
+              
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            
+            {(searchQuery || roleFilter || statusFilter) && (
+              <button onClick={clearSearch} className="clear-btn">
+                Clear Filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="users-table-container">
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>
+                  <div className="header-content">User Name</div>
+                </th>
+                <th>
+                  <div className="header-content">Email Address</div>
+                </th>
+                <th>
+                  <div className="header-content">Created At</div>
+                </th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Last Login</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {displayUsers.map((user, index) => (
+                <tr key={user.id} className="table-row">
+                  <td className="user-name-cell">
+                    <div className="user-info">
+                      <div className="user-avatar">
+                        {user.full_name.charAt(0).toUpperCase()}
+                      </div>
+                      <span>{user.full_name}</span>
+                    </div>
+                  </td>
+                  <td className="email-cell">{user.email}</td>
+                  <td className="created-cell">
+                    {new Date(user.created_at).toLocaleDateString('fr-FR', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </td>
+                  <td className="role-cell">
+                    <select
+                      value={user.role}
+                      onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                      className={`role-select ${user.role.toLowerCase()}`}
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
+                  <td className="status-cell">
+                    <span className={`status-badge ${user.is_active ? 'active' : 'inactive'}`}>
+                      {user.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="login-cell">
+                    {user.last_login 
+                      ? new Date(user.last_login).toLocaleDateString('fr-FR')
+                      : 'Never'
+                    }
+                  </td>
+                  <td className="actions-cell">
+                    <div className="user-actions">
+                      <button
+                        onClick={() => handleViewActivity(user.id)}
+                        className="action-btn view-activity"
+                        title="View Activity"
+                      >
+                        📊
+                      </button>
+                      
+                      {user.is_active ? (
+                        <button
+                          onClick={() => handleSuspendUser(user.id)}
+                          className="action-btn suspend"
+                          title="Suspend User"
+                        >
+                          ⛔
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleActivateUser(user.id)}
+                          className="action-btn activate"
+                          title="Activate User"
+                        >
+                          ✅
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          {displayUsers.length === 0 && (
+            <div className="no-users">
+              <p>No users found matching your criteria</p>
+            </div>
+          )}
+        </div>
+
+        {/* User Activity Modal */}
+        {userActivityOpen && userActivity && (
+          <div className="modal-overlay" onClick={() => setUserActivityOpen(false)}>
+            <div className="modal-content activity-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>User Activity - {userActivity.user.full_name}</h3>
+                <button
+                  className="modal-close"
+                  onClick={() => setUserActivityOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="activity-summary">
+                  <h4>Summary ({userActivity.period})</h4>
+                  <div className="summary-stats">
+                    <div className="stat-item">
+                      <span className="stat-label">Chat Sessions:</span>
+                      <span className="stat-value">{userActivity.summary.chat_sessions}</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Messages Sent:</span>
+                      <span className="stat-value">{userActivity.summary.messages_sent}</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Last Login:</span>
+                      <span className="stat-value">
+                        {userActivity.summary.last_login 
+                          ? new Date(userActivity.summary.last_login).toLocaleString('fr-FR')
+                          : 'Never'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="recent-sessions">
+                  <h4>Recent Sessions</h4>
+                  {userActivity.recent_sessions.length > 0 ? (
+                    <div className="sessions-list">
+                      {userActivity.recent_sessions.map((session, index) => (
+                        <div key={index} className="session-item">
+                          <div className="session-info">
+                            <span className="session-title">{session.title}</span>
+                            <span className="session-date">
+                              {new Date(session.created_at).toLocaleString('fr-FR')}
+                            </span>
+                          </div>
+                          <div className="session-details">
+                            <span className="message-count">{session.message_count} messages</span>
+                            {session.has_document_context && <span className="doc-badge">📄</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>No recent sessions</p>
+                  )}
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn-primary"
+                  onClick={() => setUserActivityOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* New User Modal */}
+        {newUserOpen && (
+          <div className="modal-overlay" onClick={() => setNewUserOpen(false)}>
+            <div className="modal-content new-user-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Create New User</h3>
+                <button
+                  className="modal-close"
+                  onClick={() => setNewUserOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="Enter full name"
+                    value={newUserData.full_name}
+                    onChange={(e) => setNewUserData({...newUserData, full_name: e.target.value})}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="Enter email address"
+                    value={newUserData.email}
+                    onChange={(e) => setNewUserData({...newUserData, email: e.target.value})}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Password</label>
+                  <input
+                    type="password"
+                    placeholder="Enter password (min 6 characters)"
+                    value={newUserData.password}
+                    onChange={(e) => setNewUserData({...newUserData, password: e.target.value})}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Role</label>
+                  <select
+                    value={newUserData.role}
+                    onChange={(e) => setNewUserData({...newUserData, role: e.target.value})}
+                    className="form-select"
+                  >
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn-secondary"
+                  onClick={() => setNewUserOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={handleCreateUser}
+                  disabled={!newUserData.email || !newUserData.full_name || !newUserData.password || newUserData.password.length < 6}
+                >
+                  Create User
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderFoldersSection = () => (
     <div className="folders-section">
@@ -352,21 +695,16 @@ function AdminPanel({ onNavigate, isDarkMode }) {
         <h3>Folder Actions</h3>
         <div className="actions-grid">
           <button 
-            className="action-btn upload-btn"
+            className="secure-folder-upload-btn"
             onClick={() => setUploadModalOpen(true)}
           >
             � Upload PDF CVs
           </button>
           <button 
-            className="action-btn permissions-btn"
+            className="secure-folder-permissions-btn"
             onClick={() => setPermissionsModalOpen(true)}
           >
             🔐 Manage User Permissions
-          </button>
-          <button 
-            className="action-btn audit-btn"
-          >
-            � View Activity Log
           </button>
         </div>
       </div>
@@ -713,6 +1051,29 @@ function AdminPanel({ onNavigate, isDarkMode }) {
         {/* Dynamic Content Section */}
         {renderCurrentSection()}
       </div>
+
+      {/* Custom Notification */}
+      {notification.show && (
+        <div className={`notification-toast ${notification.type}`}>
+          <div className="notification-content">
+            <div className="notification-icon">
+              {notification.type === 'success' && '✅'}
+              {notification.type === 'error' && '❌'}
+              {notification.type === 'info' && 'ℹ️'}
+            </div>
+            <div className="notification-text">
+              <div className="notification-title">{notification.title}</div>
+              <div className="notification-message">{notification.message}</div>
+            </div>
+            <button 
+              className="notification-close"
+              onClick={() => setNotification(prev => ({ ...prev, show: false }))}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="error-toast">

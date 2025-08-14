@@ -150,11 +150,11 @@ async def analyze_secure_folder(
         # Admins have automatic access, regular users need permission
         if current_user.role != "admin":
             permission = db.query(models.SecureFolderPermission).filter(
-                models.SecureFolderPermission.user_id == current_user.id,
-                models.SecureFolderPermission.has_access == True
+                models.SecureFolderPermission.user_id == current_user.id
             ).first()
             
-            if not permission:
+            # Check if user has valid permission (record exists AND has_access is True)
+            if not permission or permission.has_access != True:
                 raise HTTPException(
                     status_code=403, 
                     detail="Access denied. You don't have permission to analyze CVs from the secure folder. Please contact an administrator for access or upload your own documents to analyze."
