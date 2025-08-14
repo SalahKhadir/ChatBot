@@ -1,38 +1,6 @@
 # CGI Real Estate ChatBot 🏠🤖
 
-An intelligent conversational AI## 🏗️ Architecture
-
-### Backend (FastAPI) - Clean Modular Structure
-```
-chatbot/
-├── main.py                    # Clean application entry point (219 lines)
-├── core/                      # Core application modules
-│   ├── __init__.py           # Core module initialization
-│   ├── database.py           # Database configuration & session management
-│   ├── models.py             # SQLAlchemy database models
-│   ├── schemas.py            # Pydantic data validation schemas
-│   ├── crud.py               # Database CRUD operations
-│   ├── auth.py               # JWT authentication utilities
-│   └── dependencies.py       # FastAPI dependency injection
-├── api/                       # API route modules
-│   ├── __init__.py           # API module initialization
-│   ├── auth_routes.py        # User authentication endpoints
-│   ├── chat_routes.py        # Chat functionality & history management
-│   ├── document_routes.py    # Document analysis endpoints
-│   └── admin_routes.py       # Administrative functions
-├── services/                  # Business logic services
-│   ├── ai_service.py         # Google Gemini AI integration
-│   └── document_service.py   # PDF processing & analysis
-├── rate_limiting/            # Rate limiting system
-│   └── rate_limiter.py       # IP-based rate limiting logic
-├── config/                   # Configuration management
-│   └── settings.py           # Application settings & constants
-├── data/                     # Data storage
-│   └── cgi_simple_training.jsonl  # AI training data
-├── .env                      # Environment variables
-├── .gitignore               # Git ignore rules
-└── requirements.txt         # Python dependencies
-```igned specifically for CGI (Compagnie générale immobilière), Morocco's leading real estate company. This full-stack application combines cutting-edge AI technology with robust user management and document analysis capabilities.
+An intelligent conversational AI assistant designed specifically for CGI (Compagnie générale immobilière), Morocco's leading real estate company. This full-stack application combines cutting-edge AI technology with robust user management and document analysis capabilities.
 
 ![ChatBot Demo](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115.6-009688?style=flat&logo=fastapi)
@@ -74,6 +42,65 @@ chatbot/
 - **Conditional UI Elements**: Dynamic interface adaptation based on authentication status
 - **Quick Start Prompts**: Context-aware prompt suggestions for each section (hidden for non-authenticated secure analysis)
 - **Smooth Animations**: Polished transitions and micro-interactions throughout the interface
+
+## 🏗️ Architecture
+
+### Backend (FastAPI) - Clean Modular Structure
+```
+chatbot/
+├── main.py                    # Clean application entry point (219 lines)
+├── core/                      # Core application modules
+│   ├── __init__.py           # Core module initialization
+│   ├── database.py           # Database configuration & session management
+│   ├── models.py             # SQLAlchemy database models
+│   ├── schemas.py            # Pydantic data validation schemas
+│   ├── crud.py               # Database CRUD operations
+│   ├── auth.py               # JWT authentication utilities
+│   └── dependencies.py       # FastAPI dependency injection
+├── api/                       # API route modules
+│   ├── __init__.py           # API module initialization
+│   ├── auth_routes.py        # User authentication endpoints
+│   ├── chat_routes.py        # Chat functionality & history management
+│   ├── document_routes.py    # Document analysis endpoints
+│   └── admin_routes.py       # Administrative functions
+├── services/                  # Business logic services
+│   ├── ai_service.py         # Google Gemini AI integration
+│   └── document_service.py   # PDF processing & analysis
+├── rate_limiting/            # Rate limiting system
+│   └── rate_limiter.py       # IP-based rate limiting logic
+├── config/                   # Configuration management
+│   └── settings.py           # Application settings & constants
+├── data/                     # Data storage
+│   └── cgi_simple_training.jsonl  # AI training data
+├── .env                      # Environment variables
+├── .gitignore               # Git ignore rules
+└── requirements.txt         # Python dependencies
+```
+
+### Frontend (React + Vite)
+```
+interface/
+├── src/
+│   ├── components/      # Reusable UI components
+│   │   ├── Navbar.jsx
+│   │   ├── HistorySidebar.jsx
+│   │   ├── Login.jsx
+│   │   └── Signup.jsx
+│   ├── pages/           # Main application pages
+│   │   └── Home.jsx
+│   ├── services/        # API communication
+│   │   ├── api.js
+│   │   └── chatHistoryService.js
+│   ├── hooks/           # Custom React hooks
+│   │   ├── useChatHistory.js
+│   │   ├── useAutoScroll.js
+│   │   └── useTypingAnimation.js
+│   └── routes/          # Application routing
+├── package.json
+└── vite.config.js
+```
+
+## 🆕 Latest Features & Improvements
 
 ## 🆕 Latest Features & Improvements
 
