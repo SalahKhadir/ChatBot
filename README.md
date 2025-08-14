@@ -1,6 +1,38 @@
 # CGI Real Estate ChatBot 🏠🤖
 
-An intelligent conversational AI assistant designed specifically for CGI (Compagnie générale immobilière), Morocco's leading real estate company. This full-stack application combines cutting-edge AI technology with robust user management and document analysis capabilities.
+An intelligent conversational AI## 🏗️ Architecture
+
+### Backend (FastAPI) - Clean Modular Structure
+```
+chatbot/
+├── main.py                    # Clean application entry point (219 lines)
+├── core/                      # Core application modules
+│   ├── __init__.py           # Core module initialization
+│   ├── database.py           # Database configuration & session management
+│   ├── models.py             # SQLAlchemy database models
+│   ├── schemas.py            # Pydantic data validation schemas
+│   ├── crud.py               # Database CRUD operations
+│   ├── auth.py               # JWT authentication utilities
+│   └── dependencies.py       # FastAPI dependency injection
+├── api/                       # API route modules
+│   ├── __init__.py           # API module initialization
+│   ├── auth_routes.py        # User authentication endpoints
+│   ├── chat_routes.py        # Chat functionality & history management
+│   ├── document_routes.py    # Document analysis endpoints
+│   └── admin_routes.py       # Administrative functions
+├── services/                  # Business logic services
+│   ├── ai_service.py         # Google Gemini AI integration
+│   └── document_service.py   # PDF processing & analysis
+├── rate_limiting/            # Rate limiting system
+│   └── rate_limiter.py       # IP-based rate limiting logic
+├── config/                   # Configuration management
+│   └── settings.py           # Application settings & constants
+├── data/                     # Data storage
+│   └── cgi_simple_training.jsonl  # AI training data
+├── .env                      # Environment variables
+├── .gitignore               # Git ignore rules
+└── requirements.txt         # Python dependencies
+```igned specifically for CGI (Compagnie générale immobilière), Morocco's leading real estate company. This full-stack application combines cutting-edge AI technology with robust user management and document analysis capabilities.
 
 ![ChatBot Demo](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115.6-009688?style=flat&logo=fastapi)
@@ -43,7 +75,14 @@ An intelligent conversational AI assistant designed specifically for CGI (Compag
 - **Quick Start Prompts**: Context-aware prompt suggestions for each section (hidden for non-authenticated secure analysis)
 - **Smooth Animations**: Polished transitions and micro-interactions throughout the interface
 
-## � Latest Features & Improvements
+## 🆕 Latest Features & Improvements
+
+### 🧩 **Clean Modular Architecture (NEW)**
+- **Separation of Concerns**: Code organized into logical modules (`core/`, `api/`, `services/`, `config/`)
+- **Maintainable Codebase**: Main application entry point reduced from 1495 to 219 lines
+- **Professional Structure**: Industry-standard organization with clear module boundaries
+- **Easy Navigation**: Developers can quickly locate specific functionality
+- **Scalable Design**: New features can be easily added to appropriate modules
 
 ### 🔐 Secure CV Analysis System
 - **Protected Folder Access**: Authenticated users can analyze CVs from secure, protected folders
@@ -170,28 +209,38 @@ npm run dev
 
 ## 📚 API Documentation
 
-### Authentication Endpoints
+### Core Endpoints Structure
+The API is organized into clean, modular routes:
+
+### Authentication Endpoints (`/auth/*`)
 - `POST /auth/register` - User registration
-- `POST /auth/login` - User login
+- `POST /auth/login` - User login  
 - `GET /auth/me` - Get current user info
 
-### Chat Endpoints
+### Chat Endpoints (`/chat/*`)
 - `POST /chat` - Authenticated chat (saves to database)
 - `POST /chat/public` - Public chat (no persistence)
-- `POST /analyze-document` - Authenticated document analysis
-- `POST /analyze-document/public` - Public document analysis
-- `POST /analyze-secure-folder` - **NEW**: Secure CV analysis from protected folders (authenticated only)
-
-### Chat History Endpoints
 - `GET /chat/history` - Get user's chat history
 - `GET /chat/history/{session_id}` - Get specific chat session
 - `DELETE /chat/history/{session_id}` - Delete chat session
 - `DELETE /chat/history` - Clear all chat history
 - `PUT /chat/history/{session_id}/title` - Update chat title
 
-### Debug & Utilities
-- `GET /debug/stats` - Database statistics (no auth required)
+### Document Analysis Endpoints (`/analyze-*`)
+- `POST /analyze-document` - Authenticated document analysis
+- `POST /analyze-document/public` - Public document analysis
+- `POST /analyze-secure-folder` - **NEW**: Secure CV analysis from protected folders (authenticated only)
+
+### Admin Endpoints (`/admin/*`)
+- `GET /admin/users` - List all users (admin only)
+- `GET /admin/stats` - Platform statistics (admin only)
+- `DELETE /admin/users/{user_id}` - Delete user (admin only)
+
+### Utility Endpoints
+- `GET /` - API status and version
 - `GET /health` - Health check
+- `GET /rate-limit/status` - Rate limit status
+- `GET /test/db` - Database connection test
 - `GET /docs` - Interactive API documentation
 
 ## 🛠️ Technology Stack
@@ -271,6 +320,30 @@ npm run build
 cd chatbot
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
+
+## 👨‍💻 Development Guide
+
+### Adding New Features
+The modular architecture makes it easy to extend functionality:
+
+**Adding new API endpoints:**
+1. Create route functions in appropriate `api/` module
+2. Import and include router in `main.py`
+
+**Adding new database models:**
+1. Define model in `core/models.py`
+2. Create corresponding schema in `core/schemas.py`
+3. Add CRUD operations in `core/crud.py`
+
+**Adding new services:**
+1. Create service module in `services/` directory
+2. Import and use in relevant route handlers
+
+### Code Organization Benefits
+- **Easy Debugging**: Issues can be quickly traced to specific modules
+- **Team Collaboration**: Multiple developers can work on different modules simultaneously
+- **Testing**: Each module can be tested in isolation
+- **Maintenance**: Updates and fixes can be applied to specific areas without affecting others
 
 ## 🤝 Contributing
 
