@@ -4,13 +4,13 @@ from typing import List
 import os
 from sqlalchemy import func
 
-from database import get_db
-from models import User
-import schemas
-import models
-from dependencies import get_current_admin, get_current_user
-import crud
-import auth
+from core.database import get_db
+from core.models import User
+import core.schemas as schemas
+import core.models as models
+from core.dependencies import get_current_admin, get_current_user
+import core.crud as crud
+import core.auth as auth
 
 router = APIRouter()
 

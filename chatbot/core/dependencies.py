@@ -1,10 +1,10 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from database import get_db
-from auth import verify_token
-from crud import get_user_by_email, get_user
-from models import User
+from .database import get_db
+from .auth import verify_token
+from .crud import get_user_by_email, get_user
+from .models import User
 from typing import Optional
 
 # Security scheme
@@ -76,7 +76,7 @@ async def get_current_admin(
     current_user: User = Depends(get_current_user)
 ) -> User:
     """Verify current user is admin"""
-    from models import UserRole
+    from .models import UserRole
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

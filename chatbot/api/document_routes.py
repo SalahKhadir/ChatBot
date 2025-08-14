@@ -2,16 +2,16 @@ from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends, R
 from sqlalchemy.orm import Session
 from typing import List
 import uuid
-import models
+import core.models as models
 
-from database import get_db
-from models import User
-from schemas import MessageCreate
-from dependencies import get_current_user, get_current_admin
+from core.database import get_db
+from core.models import User
+from core.schemas import MessageCreate
+from core.dependencies import get_current_user, get_current_admin
 from services.document_service import process_uploaded_files, analyze_documents_with_ai, create_document_session
 from services.ai_service import document_sessions
 from rate_limiting.rate_limiter import check_rate_limit, increment_rate_limit
-import crud
+import core.crud as crud
 
 router = APIRouter()
 

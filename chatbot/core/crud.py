@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from models import User, ChatSession, Message
-from schemas import UserCreate, ChatSessionCreate, MessageCreate
-from auth import get_password_hash, verify_password
+from .models import User, ChatSession, Message
+from .schemas import UserCreate, ChatSessionCreate, MessageCreate
+from .auth import get_password_hash, verify_password
 from typing import Optional, List
 import json
 
@@ -201,7 +201,7 @@ def get_all_users(db: Session, skip: int = 0, limit: int = 100):
 
 def update_user_role(db: Session, user_id: int, new_role: str):
     """Update user role"""
-    from models import UserRole
+    from .models import UserRole
     db_user = db.query(User).filter(User.id == user_id).first()
     if db_user:
         db_user.role = UserRole(new_role)
@@ -230,7 +230,7 @@ def delete_user_account(db: Session, user_id: int):
 
 def get_platform_stats(db: Session):
     """Get platform statistics for admin dashboard with AI-focused metrics"""
-    from models import UserRole
+    from .models import UserRole
     from datetime import datetime, timedelta
     import random
     

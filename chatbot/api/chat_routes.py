@@ -3,13 +3,14 @@ from sqlalchemy.orm import Session
 from typing import Optional
 import uuid
 
-from database import get_db
-from models import User
-from schemas import MessageCreate
-from dependencies import get_current_user
+from core.database import get_db
+from core.models import User, ChatSession, Message
+from core.schemas import MessageCreate
+import core.schemas as schemas
+from core.dependencies import get_current_user
 from services.ai_service import chat_with_document_context, chat_without_context, document_sessions
 from rate_limiting.rate_limiter import check_rate_limit, increment_rate_limit
-import crud
+import core.crud as crud
 
 router = APIRouter()
 
@@ -130,5 +131,110 @@ async def chat_public(request: Request, message: str = Form(...), session_id: st
             }
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# CHAT HISTORY MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@router.get("/chat/history", response_model=schemas.ChatHistoryListResponse)
+async def get_chat_history(
+    skip: int = 0,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get user's chat history"""
+    try:
+        sessions = crud.get_user_chat_sessions(db, current_user.id, skip, limit)
+        total_count = db.query(ChatSession).filter(ChatSession.user_id == current_user.id).count()
+        
+        # Transform sessions to ChatHistoryResponse format
+        chat_sessions = []
+        for session in sessions:
+            # Get first message as preview
+            first_message = db.query(Message).filter(
+                Message.session_id == session.id
+            ).order_by(Message.created_at).first()
+            
+            preview = first_message.content[:100] + "..." if first_message and len(first_message.content) > 100 else (first_message.content if first_message else "No messages")
+            
+            # Get message count
+            message_count = db.query(Message).filter(Message.session_id == session.id).count()
+            
+            chat_sessions.append(schemas.ChatHistoryResponse(
+                id=session.id,
+                session_id=session.session_id,
+                title=session.title or "New Chat",
+                preview=preview,
+                message_count=message_count,
+                has_document_context=session.has_document_context or False,
+                created_at=session.created_at,
+                updated_at=session.updated_at
+            ))
+        
+        return {"chat_sessions": chat_sessions, "total_count": total_count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/chat/history/{session_id}")
+async def get_chat_session_messages(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get messages for a specific chat session"""
+    try:
+        messages = crud.get_chat_session_messages(db, session_id, current_user.id)
+        return {"messages": messages}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/chat/history/{session_id}")
+async def delete_chat_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a specific chat session"""
+    try:
+        success = crud.delete_chat_session(db, session_id, current_user.id)
+        if success:
+            return {"success": True, "message": "Chat session deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/chat/history")
+async def clear_all_chat_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Clear all chat history for the user"""
+    try:
+        success = crud.clear_user_chat_history(db, current_user.id)
+        if success:
+            return {"success": True, "message": "All chat history cleared successfully"}
+        else:
+            return {"success": True, "message": "No chat history to clear"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/chat/history/{session_id}/title")
+async def update_chat_session_title(
+    session_id: str,
+    title: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update chat session title"""
+    try:
+        updated_session = crud.update_chat_session_title(db, session_id, current_user.id, title)
+        if updated_session:
+            return {"success": True, "message": "Title updated successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Chat session not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
