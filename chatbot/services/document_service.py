@@ -4,7 +4,7 @@ from fastapi import UploadFile, HTTPException
 from google import genai
 from google.genai import types
 from services.ai_service import gemini_client, document_sessions
-from config.settings import CGI_SYSTEM_INSTRUCTION
+from config.settings import CGI_SYSTEM_INSTRUCTION, CGI_CV_ANALYSIS_INSTRUCTION
 
 async def process_uploaded_files(files: List[UploadFile]) -> tuple:
     """Process and validate uploaded PDF files"""
@@ -42,6 +42,13 @@ async def analyze_documents_with_ai(file_contents: list, prompt: str, file_count
         )
     
     # Add the prompt
+    # Determine if this is CV analysis by checking file content or prompt keywords
+    is_cv_analysis = any(keyword in prompt.lower() for keyword in 
+                        ['cv', 'resume', 'candidate', 'skills', 'experience', 'qualifications', 'hire', 'recruit'])
+    
+    # Use specialized instruction for CV analysis
+    system_instruction = CGI_CV_ANALYSIS_INSTRUCTION if is_cv_analysis else CGI_SYSTEM_INSTRUCTION
+    
     gemini_contents.append(
         f"Based on the {file_count} PDF document(s) provided above, please answer the following question: {prompt}"
     )
@@ -51,7 +58,7 @@ async def analyze_documents_with_ai(file_contents: list, prompt: str, file_count
         model="gemini-2.0-flash-exp",
         contents=gemini_contents,
         config=types.GenerateContentConfig(
-            system_instruction=CGI_SYSTEM_INSTRUCTION
+            system_instruction=system_instruction
         )
     )
 
