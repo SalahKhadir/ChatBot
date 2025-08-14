@@ -604,5 +604,111 @@ export const adminAPI = {
     }
     
     return await response.json();
+  },
+
+  // ============================================================================
+  // PLATFORM STATISTICS
+  // ============================================================================
+
+  // Get API usage statistics
+  async getApiUsageStats(hours = 24, userId = null, endpoint = null) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    let url = `${API_BASE_URL}/admin/statistics/api-usage?hours=${hours}`;
+    if (userId) url += `&user_id=${userId}`;
+    if (endpoint) url += `&endpoint=${encodeURIComponent(endpoint)}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch API usage statistics');
+    }
+    
+    return await response.json();
+  },
+
+  // Get error logs
+  async getErrorLogs(hours = 24, errorType = null, limit = 100) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    let url = `${API_BASE_URL}/admin/statistics/error-logs?hours=${hours}&limit=${limit}`;
+    if (errorType) url += `&error_type=${encodeURIComponent(errorType)}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch error logs');
+    }
+    
+    return await response.json();
+  },
+
+  // Get rate limit dashboard data
+  async getRateLimitData(hours = 24) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/statistics/rate-limits?hours=${hours}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch rate limit data');
+    }
+    
+    return await response.json();
+  },
+
+  // Get hourly request chart data
+  async getHourlyRequestData(hours = 24) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/statistics/hourly-requests?hours=${hours}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch hourly request data');
+    }
+    
+    return await response.json();
+  },
+
+  // Get platform overview statistics
+  async getPlatformOverview() {
+    const token = getAuthToken();
+    if (!token) throw new Error('No authentication token');
+
+    const response = await fetch(`${API_BASE_URL}/admin/statistics/overview`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch platform overview');
+    }
+    
+    return await response.json();
   }
 };

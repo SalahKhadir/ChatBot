@@ -69,3 +69,69 @@ class SecureFolderPermission(Base):
     # Relationships
     user = relationship("User", foreign_keys=[user_id])
     granted_by_user = relationship("User", foreign_keys=[granted_by])
+
+class ApiUsageStats(Base):
+    __tablename__ = "api_usage_stats"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    endpoint = Column(String(255), nullable=False, index=True)
+    method = Column(String(10), nullable=False)  # GET, POST, etc.
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    ip_address = Column(String(45), nullable=True, index=True)  # IPv4/IPv6
+    user_agent = Column(Text, nullable=True)
+    status_code = Column(Integer, nullable=False, index=True)
+    response_time_ms = Column(Integer, nullable=True)
+    request_size_bytes = Column(Integer, nullable=True)
+    response_size_bytes = Column(Integer, nullable=True)
+    gemini_tokens_used = Column(Integer, nullable=True)
+    gemini_cost_usd = Column(String(20), nullable=True)  # Store as string for precision
+    rate_limited = Column(Boolean, default=False, index=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    
+    # Relationships
+    user = relationship("User")
+
+class SystemErrorLog(Base):
+    __tablename__ = "system_error_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    error_type = Column(String(100), nullable=False, index=True)  # API_ERROR, PARSING_ERROR, etc.
+    endpoint = Column(String(255), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    error_code = Column(String(50), nullable=True)
+    error_message = Column(Text, nullable=False)
+    stack_trace = Column(Text, nullable=True)
+    request_data = Column(Text, nullable=True)  # JSON string of request data
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    
+    # Relationships
+    user = relationship("User")
+
+class RateLimitEvent(Base):
+    __tablename__ = "rate_limit_events"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    ip_address = Column(String(45), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    endpoint = Column(String(255), nullable=False)
+    limit_type = Column(String(50), nullable=False)  # REQUEST_LIMIT, FILE_LIMIT, etc.
+    current_count = Column(Integer, nullable=False)
+    limit_threshold = Column(Integer, nullable=False)
+    reset_time = Column(DateTime(timezone=True), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    
+    # Relationships
+    user = relationship("User")
+
+class PlatformMetrics(Base):
+    __tablename__ = "platform_metrics"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    metric_name = Column(String(100), nullable=False, index=True)
+    metric_value = Column(String(255), nullable=False)  # Store as string for flexibility
+    metric_type = Column(String(50), nullable=False)  # COUNT, GAUGE, RATE, etc.
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    additional_data = Column(Text, nullable=True)  # JSON string for additional data

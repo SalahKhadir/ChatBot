@@ -11,6 +11,9 @@ import core.models as models
 from core.models import User, ChatSession, Message
 import core.schemas as schemas
 
+# Import statistics middleware
+# from core.statistics_middleware import StatisticsMiddleware
+
 # Import API routes
 from api.auth_routes import router as auth_router
 from api.chat_routes import router as chat_router
@@ -32,6 +35,9 @@ app = FastAPI(
     description="Clean AI-powered chatbot with authentication",
     version="2.0.0"
 )
+
+# Add statistics middleware (before CORS) - temporarily disabled
+# app.add_middleware(StatisticsMiddleware)
 
 # CORS middleware
 app.add_middleware(

@@ -12,6 +12,15 @@ function AdminPanel({ onNavigate, isDarkMode }) {
   const [messagesOpen, setMessagesOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('overview'); // New state for navigation
   
+  // Platform Statistics state
+  const [platformStats, setPlatformStats] = useState({});
+  const [apiUsageStats, setApiUsageStats] = useState({});
+  const [errorLogs, setErrorLogs] = useState([]);
+  const [rateLimitData, setRateLimitData] = useState({});
+  const [hourlyData, setHourlyData] = useState([]);
+  const [statsTimeframe, setStatsTimeframe] = useState(24); // hours
+  const [statsLoading, setStatsLoading] = useState(false);
+  
   // Advanced User Management state
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -50,6 +59,13 @@ function AdminPanel({ onNavigate, isDarkMode }) {
     loadAdminData();
   }, []);
 
+  // Load statistics when stats section is active
+  useEffect(() => {
+    if (activeSection === 'stats') {
+      loadStatisticsData(statsTimeframe);
+    }
+  }, [activeSection, statsTimeframe]);
+
   const loadAdminData = async () => {
     try {
       setIsLoading(true);
@@ -69,6 +85,64 @@ function AdminPanel({ onNavigate, isDarkMode }) {
       console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadStatisticsData = async (hours = 24) => {
+    try {
+      setStatsLoading(true);
+      const [
+        platformOverview,
+        apiUsage,
+        errors,
+        rateLimits,
+        hourlyRequests
+      ] = await Promise.all([
+        adminAPI.getPlatformOverview(),
+        adminAPI.getApiUsageStats(hours),
+        adminAPI.getErrorLogs(hours),
+        adminAPI.getRateLimitData(hours),
+        adminAPI.getHourlyRequestData(hours)
+      ]);
+      
+      setPlatformStats(platformOverview);
+      setApiUsageStats(apiUsage);
+      setErrorLogs(errors);
+      setRateLimitData(rateLimits);
+      setHourlyData(hourlyRequests);
+    } catch (err) {
+      console.error('Failed to load statistics:', err);
+      showNotification('error', 'Error', 'Failed to load statistics data');
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const generateSampleData = async () => {
+    try {
+      setStatsLoading(true);
+      showNotification('info', 'Info', 'Generating sample data...');
+      
+      const response = await fetch(`http://localhost:8000/admin/statistics/generate-sample-data`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        showNotification('success', 'Success', 'Sample data generated successfully');
+        // Reload statistics after generating sample data
+        await loadStatisticsData(statsTimeframe);
+      } else {
+        throw new Error('Failed to generate sample data');
+      }
+    } catch (err) {
+      console.error('Failed to generate sample data:', err);
+      showNotification('error', 'Error', 'Failed to generate sample data');
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -309,47 +383,267 @@ function AdminPanel({ onNavigate, isDarkMode }) {
 
   const renderStatsSection = () => (
     <div className="stats-section">
-      <div className="overview-header">
-        <h1>Platform Statistics</h1>
-        <p className="overview-date">
-          {new Date().toLocaleDateString('fr-FR', { 
-            month: 'long', 
-            day: 'numeric' 
-          })}
-        </p>
+      <div className="stats-header">
+        <div className="stats-title-section">
+          <h1>Platform Statistics</h1>
+          <p className="stats-date">
+            Last updated: {new Date().toLocaleString('fr-FR')}
+          </p>
+        </div>
+        <div className="stats-controls">
+          <select
+            value={statsTimeframe}
+            onChange={(e) => setStatsTimeframe(parseInt(e.target.value))}
+            className="stats-timeframe-select"
+          >
+            <option value={1}>Last Hour</option>
+            <option value={24}>Last 24 Hours</option>
+            <option value={168}>Last Week</option>
+            <option value={720}>Last Month</option>
+          </select>
+          <button
+            onClick={() => loadStatisticsData(statsTimeframe)}
+            className="stats-refresh-btn"
+            disabled={statsLoading}
+          >
+            {statsLoading ? 'Loading...' : '🔄 Refresh'}
+          </button>
+          <button
+            onClick={generateSampleData}
+            className="stats-sample-data-btn"
+            disabled={statsLoading}
+          >
+            📊 Generate Sample Data
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                setStatsLoading(true);
+                const response = await fetch('http://localhost:8000/admin/statistics/generate-sample-data', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                    'Content-Type': 'application/json'
+                  }
+                });
+                if (response.ok) {
+                  showNotification('success', 'Success', 'Sample data generated successfully');
+                  loadStatisticsData(statsTimeframe);
+                } else {
+                  throw new Error('Failed to generate sample data');
+                }
+              } catch (err) {
+                showNotification('error', 'Error', 'Failed to generate sample data');
+              } finally {
+                setStatsLoading(false);
+              }
+            }}
+            className="stats-refresh-btn"
+            disabled={statsLoading}
+            style={{ background: '#28a745' }}
+          >
+            🎲 Generate Sample Data
+          </button>
+        </div>
       </div>
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon">👥</div>
-          <h3>{stats.total_users || 0}</h3>
-          <p>Total Users</p>
+
+      {statsLoading ? (
+        <div className="stats-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading statistics...</p>
         </div>
-        <div className="stat-card">
-          <div className="stat-icon">✅</div>
-          <h3>{stats.active_users || 0}</h3>
-          <p>Active Users</p>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">👨‍💼</div>
-          <h3>{stats.admin_users || 0}</h3>
-          <p>Administrators</p>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">💬</div>
-          <h3>{stats.daily_queries || 0}</h3>
-          <p>Daily Queries</p>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">⚡</div>
-          <h3>{stats.ai_response_time || 0}ms</h3>
-          <p>Avg Response Time</p>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">🎯</div>
-          <h3>{stats.ai_accuracy || 0}%</h3>
-          <p>AI Accuracy</p>
-        </div>
-      </div>
+      ) : (
+        <>
+          {/* Platform Overview */}
+          <div className="stats-overview">
+            <h2>Platform Overview</h2>
+            <div className="stats-grid">
+              <div className="stat-card primary">
+                <div className="stat-icon">👥</div>
+                <div className="stat-content">
+                  <h3>{platformStats.overview?.total_users || 0}</h3>
+                  <p>Total Users</p>
+                  <span className="stat-subtext">{platformStats.overview?.active_users_24h || 0} active today</span>
+                </div>
+              </div>
+              <div className="stat-card success">
+                <div className="stat-icon">📊</div>
+                <div className="stat-content">
+                  <h3>{platformStats.overview?.total_requests_24h || 0}</h3>
+                  <p>Requests (24h)</p>
+                  <span className="stat-subtext">{platformStats.overview?.avg_requests_per_minute || 0}/min</span>
+                </div>
+              </div>
+              <div className="stat-card info">
+                <div className="stat-icon">✅</div>
+                <div className="stat-content">
+                  <h3>{platformStats.overview?.success_rate_24h || 0}%</h3>
+                  <p>Success Rate</p>
+                  <span className="stat-subtext">Last 24 hours</span>
+                </div>
+              </div>
+              <div className="stat-card warning">
+                <div className="stat-icon">🤖</div>
+                <div className="stat-content">
+                  <h3>{platformStats.overview?.total_gemini_tokens_24h || 0}</h3>
+                  <p>AI Tokens Used</p>
+                  <span className="stat-subtext">Gemini API</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* API Usage Statistics */}
+          <div className="stats-section-api">
+            <h2>API Usage Analytics</h2>
+            <div className="stats-cards-row">
+              <div className="stats-card-detailed">
+                <h3>Request Statistics</h3>
+                <div className="stats-table-container">
+                  <table className="stats-table">
+                    <tbody>
+                      <tr>
+                        <td>Total Requests</td>
+                        <td>{apiUsageStats.total_requests || 0}</td>
+                      </tr>
+                      <tr>
+                        <td>Requests/Minute</td>
+                        <td>{apiUsageStats.requests_per_minute || 0}</td>
+                      </tr>
+                      <tr>
+                        <td>Avg Response Time</td>
+                        <td>{apiUsageStats.avg_response_time_ms || 0}ms</td>
+                      </tr>
+                      <tr>
+                        <td>Success Rate</td>
+                        <td>{apiUsageStats.success_rate || 0}%</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              <div className="stats-card-detailed">
+                <h3>Top Endpoints</h3>
+                <div className="stats-list">
+                  {apiUsageStats.top_endpoints?.slice(0, 5).map((endpoint, index) => (
+                    <div key={index} className="stats-list-item">
+                      <span className="endpoint-name">{endpoint.endpoint}</span>
+                      <span className="endpoint-count">{endpoint.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Rate Limiting Dashboard */}
+          <div className="stats-section-rate-limits">
+            <h2>Rate Limiting Dashboard</h2>
+            <div className="stats-cards-row">
+              <div className="stats-card-alert">
+                <h3>Rate Limit Events</h3>
+                <div className="alert-stat">
+                  <span className="alert-number">{rateLimitData.total_events || 0}</span>
+                  <span className="alert-text">Events in last {statsTimeframe}h</span>
+                </div>
+              </div>
+              
+              <div className="stats-card-detailed">
+                <h3>Top Rate-Limited IPs</h3>
+                <div className="stats-list">
+                  {rateLimitData.top_ips?.slice(0, 5).map((ip, index) => (
+                    <div key={index} className="stats-list-item">
+                      <span className="ip-address">{ip.ip}</span>
+                      <span className="ip-count">{ip.count} events</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="stats-card-detailed">
+                <h3>Rate Limit Types</h3>
+                <div className="stats-list">
+                  {rateLimitData.events_by_type?.map((type, index) => (
+                    <div key={index} className="stats-list-item">
+                      <span className="limit-type">{type.type}</span>
+                      <span className="limit-count">{type.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Error Logs */}
+          <div className="stats-section-errors">
+            <h2>Recent Error Logs</h2>
+            <div className="error-logs-container">
+              {errorLogs.length === 0 ? (
+                <p className="no-errors">No errors in the selected timeframe ✅</p>
+              ) : (
+                <div className="error-logs-list">
+                  {errorLogs.slice(0, 10).map((error, index) => (
+                    <div key={error.id} className="error-log-item">
+                      <div className="error-header">
+                        <span className="error-type">{error.error_type}</span>
+                        <span className="error-time">
+                          {new Date(error.created_at).toLocaleString('fr-FR')}
+                        </span>
+                      </div>
+                      <div className="error-details">
+                        <p className="error-message">{error.error_message}</p>
+                        {error.endpoint && (
+                          <span className="error-endpoint">Endpoint: {error.endpoint}</span>
+                        )}
+                        {error.user_email && (
+                          <span className="error-user">User: {error.user_email}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <div className="stats-section-activity">
+            <h2>Recent Platform Activity</h2>
+            <div className="stats-cards-row">
+              <div className="stats-card-detailed">
+                <h3>Most Active Users</h3>
+                <div className="stats-list">
+                  {platformStats.top_users_24h?.map((user, index) => (
+                    <div key={index} className="stats-list-item">
+                      <span className="user-email">{user.email}</span>
+                      <span className="user-requests">{user.count} requests</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="stats-card-detailed">
+                <h3>Quick Stats</h3>
+                <div className="quick-stats">
+                  <div className="quick-stat">
+                    <span className="quick-stat-number">{platformStats.overview?.total_requests_1h || 0}</span>
+                    <span className="quick-stat-label">Requests (1h)</span>
+                  </div>
+                  <div className="quick-stat">
+                    <span className="quick-stat-number">{platformStats.overview?.total_requests_7d || 0}</span>
+                    <span className="quick-stat-label">Requests (7d)</span>
+                  </div>
+                  <div className="quick-stat">
+                    <span className="quick-stat-number">{rateLimitData.total_events || 0}</span>
+                    <span className="quick-stat-label">Rate Limits</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 

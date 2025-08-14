@@ -1,11 +1,13 @@
-from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, Form
+from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, Form, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional, Dict, Any
 import os
 from sqlalchemy import func
+from datetime import datetime, timedelta
 
 from core.database import get_db
-from core.models import User
+from core.models import User, ApiUsageStats
+from core.statistics_service import StatisticsService
 import core.schemas as schemas
 import core.models as models
 from core.dependencies import get_current_admin, get_current_user
@@ -504,3 +506,164 @@ async def delete_from_secure_folder(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
+
+# ============================================================================
+# PLATFORM STATISTICS
+# ============================================================================
+
+@router.get("/admin/test")
+async def test_admin_endpoint():
+    """Test endpoint to verify admin routes are working."""
+    from datetime import datetime
+    return {"message": "Admin routes are working!", "timestamp": datetime.utcnow().isoformat()}
+
+@router.get("/admin/statistics/api-usage")
+async def get_api_usage_statistics(
+    hours: int = Query(24, description="Number of hours to look back"),
+    user_id: Optional[int] = Query(None, description="Filter by specific user ID"),
+    endpoint: Optional[str] = Query(None, description="Filter by specific endpoint"),
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Get API usage statistics for the specified time period."""
+    try:
+        return StatisticsService.get_api_usage_stats(
+            db=db,
+            hours=hours,
+            user_id=user_id,
+            endpoint=endpoint
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to retrieve API usage statistics: {str(e)}"
+        )
+
+@router.get("/admin/statistics/error-logs")
+async def get_error_logs(
+    hours: int = Query(24, description="Number of hours to look back"),
+    error_type: Optional[str] = Query(None, description="Filter by error type"),
+    limit: int = Query(100, description="Maximum number of logs to return"),
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """Get recent system error logs."""
+    try:
+        return StatisticsService.get_error_logs(
+            db=db,
+            hours=hours,
+            error_type=error_type,
+            limit=limit
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to retrieve error logs: {str(e)}"
+        )
+
+@router.get("/admin/statistics/rate-limits")
+async def get_rate_limit_dashboard(
+    hours: int = Query(24, description="Number of hours to look back"),
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Get rate limit dashboard data."""
+    try:
+        return StatisticsService.get_rate_limit_dashboard(
+            db=db,
+            hours=hours
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to retrieve rate limit data: {str(e)}"
+        )
+
+@router.get("/admin/statistics/hourly-requests")
+async def get_hourly_request_data(
+    hours: int = Query(24, description="Number of hours to look back"),
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """Get hourly request data for charts."""
+    try:
+        return StatisticsService.get_hourly_request_chart_data(
+            db=db,
+            hours=hours
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to retrieve hourly request data: {str(e)}"
+        )
+
+@router.get("/admin/statistics/overview")
+async def get_platform_overview(
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Get comprehensive platform overview statistics."""
+    try:
+        # Get data for different time periods
+        last_hour_stats = StatisticsService.get_api_usage_stats(db, hours=1)
+        last_24h_stats = StatisticsService.get_api_usage_stats(db, hours=24)
+        last_week_stats = StatisticsService.get_api_usage_stats(db, hours=168)  # 7 days
+        
+        # Get error logs for last 24h
+        recent_errors = StatisticsService.get_error_logs(db, hours=24, limit=10)
+        
+        # Get rate limit data
+        rate_limit_data = StatisticsService.get_rate_limit_dashboard(db, hours=24)
+        
+        # Get total user count
+        total_users = db.query(func.count(models.User.id)).scalar()
+        
+        # Get active users (users who made requests in last 24h)
+        since_time = datetime.utcnow() - timedelta(hours=24)
+        active_users = db.query(func.count(func.distinct(ApiUsageStats.user_id))).filter(
+            ApiUsageStats.created_at >= since_time
+        ).scalar() or 0
+        
+        return {
+            "overview": {
+                "total_users": total_users,
+                "active_users_24h": active_users,
+                "total_requests_1h": last_hour_stats["total_requests"],
+                "total_requests_24h": last_24h_stats["total_requests"],
+                "total_requests_7d": last_week_stats["total_requests"],
+                "avg_requests_per_minute": last_24h_stats["requests_per_minute"],
+                "success_rate_24h": last_24h_stats["success_rate"],
+                "total_gemini_tokens_24h": last_24h_stats["total_gemini_tokens"],
+                "rate_limited_requests_24h": rate_limit_data["total_events"]
+            },
+            "recent_errors": recent_errors,
+            "top_endpoints_24h": last_24h_stats["top_endpoints"][:5],
+            "top_users_24h": last_24h_stats["top_users"][:5],
+            "rate_limit_summary": {
+                "total_events": rate_limit_data["total_events"],
+                "top_ips": rate_limit_data["top_ips"][:3]
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to retrieve platform overview: {str(e)}"
+        )
+
+@router.post("/admin/statistics/generate-sample-data")
+async def generate_sample_statistics_data(
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+) -> Dict[str, str]:
+    """Generate sample statistics data for testing purposes."""
+    try:
+        StatisticsService.create_sample_data(db)
+        return {
+            "message": "Sample statistics data generated successfully",
+            "status": "success"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to generate sample data: {str(e)}"
+        )
